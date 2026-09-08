@@ -11,7 +11,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('h1')?.textContent).toContain('Your contacts');
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toContain('Contacts');
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(5);
   });
 

@@ -2,12 +2,10 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTableModule } from '@angular/material/table';
-import { MatToolbarModule } from '@angular/material/toolbar';
 
 interface Contact {
   id: string;
@@ -84,7 +82,7 @@ export class ContactDialog {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe, MatButtonModule, MatCardModule, MatTableModule, MatToolbarModule],
+  imports: [DatePipe, MatButtonModule, MatTableModule],
   templateUrl: './app.html',
 })
 export class App {
