@@ -4,6 +4,8 @@
 
 - .NET SDK 10
 - EF Core command-line tools 10.0.8
+- Node.js 26
+- npm 11
 
 Check the installed tools:
 
@@ -64,6 +66,29 @@ The HTTP development profile listens on port 5187. Open the Swagger UI at:
 
 ```text
 http://localhost:5187/swagger
+```
+
+## Run the web application
+
+The current web checkpoint is a client-only Angular visual proof. It uses
+in-memory contacts and does not call the API yet.
+
+In a separate terminal from the repository root:
+
+```sh
+cd web
+npm install
+npm start
+```
+
+Open `http://localhost:5186`. Changes under `web/src/` reload automatically.
+
+Build and test the web application with:
+
+```sh
+cd web
+npm run build
+npm test -- --no-watch
 ```
 
 Read the five seeded contacts directly with:
