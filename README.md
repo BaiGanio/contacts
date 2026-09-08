@@ -60,12 +60,32 @@ Apply the migrations first, then start the development profile:
 dotnet run --project src/Contacts.Api --launch-profile http
 ```
 
-The assigned local URL is printed in the terminal. Open `/swagger` below that
-URL to use Swagger UI, or request the seeded contacts directly. For example, if
-the terminal prints `http://localhost:5123`:
+The HTTP development profile listens on port 5187. Open the Swagger UI at:
+
+```text
+http://localhost:5187/swagger
+```
+
+Read the five seeded contacts directly with:
 
 ```sh
-curl http://localhost:5123/api/contacts
+curl http://localhost:5187/api/contacts
 ```
 
 The endpoint reads all persisted contacts, including normalized IBAN values.
+
+The create endpoint is not implemented yet. Keep this request as a reference
+for the create-contact work in the next checkpoint:
+
+```sh
+curl -i http://localhost:5187/api/contacts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "firstName": "Ada",
+    "surname": "Lovelace",
+    "dateOfBirth": "1815-12-10",
+    "address": "12 St James Square, London",
+    "phoneNumber": "+44 20 7946 0000",
+    "iban": "gb82 west 1234 5698 7654 32"
+  }'
+```
