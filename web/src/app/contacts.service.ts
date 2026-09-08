@@ -44,7 +44,7 @@ function toContact(apiContact: ApiContact): Contact {
 @Injectable({ providedIn: 'root' })
 export class ContactsService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = '/api/contacts';
+  private readonly baseUrl = 'http://localhost:5187/api/contacts';
 
   list(): Observable<Contact[]> {
     return this.http.get<ApiContact[]>(this.baseUrl).pipe(map((contacts) => contacts.map(toContact)));

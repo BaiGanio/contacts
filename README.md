@@ -82,12 +82,9 @@ npm start
 
 Open `http://localhost:5186`. Changes under `web/src/` reload automatically.
 
-The Angular dev server proxies `/api` requests to `http://localhost:5187`
-using `web/proxy.conf.js`, so the browser never calls the API's origin
-directly and no CORS policy is needed on the API. This proxy is a
-**temporary development convenience** for this checkpoint; remove
-`web/proxy.conf.js` and the `proxyConfig` entry in `web/angular.json` once
-the real hosting/CORS flow is introduced.
+The web application calls the API directly at `http://localhost:5187`. The
+API allows this with a CORS policy (in `src/Contacts.Api/Program.cs`) that
+permits requests from `http://localhost:5186`.
 
 Build and test the web application with:
 

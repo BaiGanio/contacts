@@ -7,9 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Contacts")
     ?? throw new InvalidOperationException("Connection string 'Contacts' was not found.");
 
+const string AngularDevClient = "AngularDevClient";
+
 builder.Services.AddDbContext<ContactsDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(AngularDevClient, policy =>
+        policy.WithOrigins("http://localhost:5186")
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -18,6 +27,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors(AngularDevClient);
 
 app.MapGet("/", () => "Hello World!");
 
