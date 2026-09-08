@@ -39,7 +39,8 @@ dotnet ef database update --project src/Contacts.Api
 This creates `src/Contacts.Api/contacts.db`. The database file and its SQLite
 sidecar files are local development output and are intentionally ignored by
 Git. The migrations and SQLite configuration remain checked in, so every
-developer can create the same database locally.
+developer can create the same database locally. A fresh database contains the
+five contacts from `seed-data/contacts-01-initial-5.csv`.
 
 When the EF model intentionally changes, create a migration from the repository
 root and then apply it:

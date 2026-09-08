@@ -16,24 +16,30 @@ public sealed class ContactsDbContextTests
 
         try
         {
+            Guid contactId;
+
             await using (var writeContext = new ContactsDbContext(options))
             {
                 await writeContext.Database.MigrateAsync();
-                writeContext.Contacts.Add(new Contact(
+                Assert.Equal(5, await writeContext.Contacts.CountAsync());
+
+                var createdContact = new Contact(
                     "Ada",
                     "Lovelace",
                     new DateOnly(1815, 12, 10),
                     "12 St James's Square, London",
                     "+44 20 7946 0000",
-                    new Iban("gb82 west 1234 5698 7654 32")));
+                    new Iban("gb82 west 1234 5698 7654 32"));
+                contactId = createdContact.Id;
+                writeContext.Contacts.Add(createdContact);
                 await writeContext.SaveChangesAsync();
             }
 
             await using var readContext = new ContactsDbContext(options);
-            var contact = await readContext.Contacts.SingleAsync();
+            var reloadedContact = await readContext.Contacts.SingleAsync(value => value.Id == contactId);
 
-            Assert.Equal("Ada", contact.FirstName);
-            Assert.Equal("GB82WEST12345698765432", contact.Iban.Value);
+            Assert.Equal("Ada", reloadedContact.FirstName);
+            Assert.Equal("GB82WEST12345698765432", reloadedContact.Iban.Value);
         }
         finally
         {
