@@ -116,3 +116,26 @@ curl -i http://localhost:5187/api/contacts \
     "iban": "gb82 west 1234 5698 7654 32"
   }'
 ```
+
+## Import contacts from a CSV file
+
+`POST /api/contacts/import` accepts a multipart file upload (field name
+`file`) with these required columns: `FirstName`, `Surname`, `DateOfBirth`
+(`yyyy-MM-dd`), `Street`, `City`, `PostalCode`, `Country`, `Phone`, and
+`Iban`. The address columns are combined into one string:
+`Street, PostalCode City, Country`. Files over 1 MB or 1,000 data rows are
+rejected. If any row fails validation, the whole file is rejected and no
+rows are saved; the response lists every failing row number and its error.
+
+Importing the same file twice creates duplicate contacts — the IBAN is not
+treated as a unique person identifier.
+
+Import one of the fixtures under `seed-data/`:
+
+```sh
+curl -i http://localhost:5187/api/contacts/import \
+  -F 'file=@seed-data/contacts-01-initial-5.csv;type=text/csv'
+```
+
+The Angular page has an **Import file** button that opens a file picker,
+sends the chosen CSV to this endpoint, and reloads the table on success.
