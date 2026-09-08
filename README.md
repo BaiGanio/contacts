@@ -74,8 +74,7 @@ curl http://localhost:5187/api/contacts
 
 The endpoint reads all persisted contacts, including normalized IBAN values.
 
-The create endpoint is not implemented yet. Keep this request as a reference
-for the create-contact work in the next checkpoint:
+Create and persist a contact with:
 
 ```sh
 curl -i http://localhost:5187/api/contacts \

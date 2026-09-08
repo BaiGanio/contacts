@@ -1,4 +1,5 @@
 using Contacts.Api.Data;
+using Contacts.Domain;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,4 +26,28 @@ app.MapGet("/api/contacts", async (ContactsDbContext dbContext) =>
         .AsNoTracking()
         .ToListAsync());
 
+app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbContext dbContext) =>
+{
+    var contact = new Contact(
+        request.FirstName,
+        request.Surname,
+        request.DateOfBirth,
+        request.Address,
+        request.PhoneNumber,
+        new Iban(request.Iban));
+
+    dbContext.Contacts.Add(contact);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/contacts/{contact.Id}", contact);
+});
+
 app.Run();
+
+public sealed record CreateContactRequest(
+    string FirstName,
+    string Surname,
+    DateOnly DateOfBirth,
+    string Address,
+    string PhoneNumber,
+    string Iban);
