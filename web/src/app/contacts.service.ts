@@ -14,6 +14,16 @@ export interface Contact {
 
 export type NewContact = Omit<Contact, 'id'>;
 
+export interface ImportRowError {
+  row: number;
+  message: string;
+}
+
+export interface ImportResult {
+  importedCount: number;
+  errors: ImportRowError[];
+}
+
 interface ApiContact {
   id: string;
   firstName: string;
@@ -52,5 +62,11 @@ export class ContactsService {
 
   create(contact: NewContact): Observable<Contact> {
     return this.http.post<ApiContact>(this.baseUrl, contact).pipe(map(toContact));
+  }
+
+  import(file: File): Observable<ImportResult> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<ImportResult>(`${this.baseUrl}/import`, formData);
   }
 }

@@ -1,8 +1,21 @@
 <main class="content">
   <header class="page-heading">
     <h1>Contacts</h1>
-    <button mat-flat-button type="button" (click)="openCreateDialog()">Add contact</button>
+    <div class="page-actions">
+      <input #csvInput type="file" accept=".csv" hidden (change)="importFile(csvInput)" />
+      <button mat-button type="button" [disabled]="importing()" (click)="csvInput.click()">
+        {{ importing() ? 'Importing...' : 'Import file' }}
+      </button>
+      <button mat-flat-button type="button" (click)="openCreateDialog()">Add contact</button>
+    </div>
   </header>
+
+  @if (importMessage()) {
+    <p class="status">{{ importMessage() }}</p>
+  }
+  @if (importError()) {
+    <p class="status status-error">{{ importError() }}</p>
+  }
 
   <p class="count">{{ contactCount() }} contacts</p>
 

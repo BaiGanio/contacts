@@ -108,6 +108,10 @@ export class App {
   protected readonly empty = computed(() => !this.loading() && !this.loadError() && this.contacts().length === 0);
   protected readonly displayedColumns = ['contact', 'dateOfBirth', 'address', 'phoneNumber', 'iban'];
 
+  protected readonly importing = signal(false);
+  protected readonly importMessage = signal<string | null>(null);
+  protected readonly importError = signal<string | null>(null);
+
   constructor() {
     this.loadContacts();
   }
@@ -123,6 +127,35 @@ export class App {
       error: () => {
         this.loadError.set(LOAD_ERROR_MESSAGE);
         this.loading.set(false);
+      },
+    });
+  }
+
+  protected importFile(input: HTMLInputElement): void {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+
+    this.importing.set(true);
+    this.importMessage.set(null);
+    this.importError.set(null);
+    this.contactsService.import(file).subscribe({
+      next: (result) => {
+        this.importing.set(false);
+        if (result.errors.length > 0) {
+          this.importError.set(
+            `Import failed: ${result.errors.map((rowError) => `row ${rowError.row}: ${rowError.message}`).join('; ')}`,
+          );
+          return;
+        }
+        this.importMessage.set(`Imported ${result.importedCount} contact(s).`);
+        this.loadContacts();
+      },
+      error: (error) => {
+        this.importing.set(false);
+        this.importError.set(error?.error?.error ?? 'Could not import the file. Check that the API is running, then try again.');
       },
     });
   }
