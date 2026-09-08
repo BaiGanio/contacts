@@ -7,10 +7,13 @@ body { font-family: Roboto, Arial, sans-serif; margin: 0; min-width: 320px; }
 .page-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
 .page-heading h1 { font-size: 24px; font-weight: 500; margin: 0; }
 .count { color: rgba(0, 0, 0, 0.6); margin: 0 0 16px; }
+.status { color: rgba(0, 0, 0, 0.6); margin: 0 0 8px; }
+.status-error { color: #b00020; }
 .table-scroll { border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; overflow-x: auto; }
 table { min-width: 960px; width: 100%; }
 code { white-space: nowrap; }
 .contact-form { display: grid; gap: 0 16px; grid-template-columns: 1fr 1fr; padding-top: 8px; }
+.form-error { color: #b00020; margin: 0 0 8px; }
 
 @media (max-width: 700px) {
   .content { padding: 24px 16px; }

@@ -70,10 +70,9 @@ http://localhost:5187/swagger
 
 ## Run the web application
 
-The current web checkpoint is a client-only Angular visual proof. It uses
-in-memory contacts and does not call the API yet.
-
-In a separate terminal from the repository root:
+The web application loads contacts from the API's `GET /api/contacts` and
+creates them through `POST /api/contacts`. Start the API first (see above),
+then in a separate terminal from the repository root:
 
 ```sh
 cd web
@@ -82,6 +81,13 @@ npm start
 ```
 
 Open `http://localhost:5186`. Changes under `web/src/` reload automatically.
+
+The Angular dev server proxies `/api` requests to `http://localhost:5187`
+using `web/proxy.conf.js`, so the browser never calls the API's origin
+directly and no CORS policy is needed on the API. This proxy is a
+**temporary development convenience** for this checkpoint; remove
+`web/proxy.conf.js` and the `proxyConfig` entry in `web/angular.json` once
+the real hosting/CORS flow is introduced.
 
 Build and test the web application with:
 

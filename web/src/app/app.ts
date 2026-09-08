@@ -6,26 +6,16 @@ import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dial
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTableModule } from '@angular/material/table';
+import { Contact, ContactsService, NewContact } from './contacts.service';
 
-interface Contact {
-  id: string;
-  firstName: string;
-  surname: string;
-  dateOfBirth: string;
-  address: string;
-  phoneNumber: string;
-  iban: string;
+const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
+
+function readableSubmitError(error: unknown): string {
+  if (error instanceof ProgressEvent || (error as { status?: number })?.status === 0) {
+    return 'Could not reach the server. Check that the API is running, then try again.';
+  }
+  return 'Could not save this contact. Check the values and try again.';
 }
-
-type ContactFormValue = Omit<Contact, 'id'>;
-
-const SAMPLE_CONTACTS: Contact[] = [
-  { id: '1', firstName: 'Ahmed', surname: 'Ivanov', dateOfBirth: '1965-10-19', address: 'Kirkkokatu 36, 85532 Espoo, FI', phoneNumber: '+358001338908', iban: 'FI2816525808631930' },
-  { id: '2', firstName: 'Günter', surname: 'Fürst', dateOfBirth: '1969-03-14', address: 'Löwenplatz 12, 59615 Hamburg, DE', phoneNumber: '+49184959310', iban: 'DE59679883481367606524' },
-  { id: '3', firstName: 'Renée', surname: 'Röder', dateOfBirth: '1978-07-20', address: 'Brühlstraße 84, 14207 München, DE', phoneNumber: '+49564139537', iban: 'DE73394225258329500167' },
-  { id: '4', firstName: 'Marco', surname: 'Marchetti', dateOfBirth: '1959-01-12', address: 'Lindenallee 65, 99166 Würzburg, DE', phoneNumber: '+49184514627', iban: 'DE61077975168513199954' },
-  { id: '5', firstName: 'Röschen', surname: 'Röder', dateOfBirth: '1965-01-24', address: 'Hauptstraße 62, 21226 Lübeck, DE', phoneNumber: '+49718227824', iban: 'DE12569976736384200550' },
-];
 
 @Component({
   selector: 'app-contact-dialog',
@@ -34,6 +24,9 @@ const SAMPLE_CONTACTS: Contact[] = [
     <h2 mat-dialog-title>Add a new contact</h2>
     <mat-dialog-content>
       <p>Enter the details below. Every field is required.</p>
+      @if (submitError()) {
+        <p class="form-error">{{ submitError() }}</p>
+      }
       <form id="contact-form" class="contact-form" [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline"><mat-label>First name</mat-label><input matInput formControlName="firstName" /><mat-error>Required</mat-error></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Surname</mat-label><input matInput formControlName="surname" /><mat-error>Required</mat-error></mat-form-field>
@@ -44,14 +37,20 @@ const SAMPLE_CONTACTS: Contact[] = [
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>Cancel</button>
-      <button mat-flat-button type="submit" form="contact-form">Add contact</button>
+      <button mat-button type="button" mat-dialog-close [disabled]="submitting()">Cancel</button>
+      <button mat-flat-button type="submit" form="contact-form" [disabled]="submitting()">
+        {{ submitting() ? 'Saving...' : 'Add contact' }}
+      </button>
     </mat-dialog-actions>
   `,
 })
 export class ContactDialog {
   private readonly formBuilder = inject(FormBuilder);
-  private readonly dialogRef = inject(MatDialogRef<ContactDialog, ContactFormValue>);
+  private readonly dialogRef = inject(MatDialogRef<ContactDialog, Contact>);
+  private readonly contactsService = inject(ContactsService);
+
+  protected readonly submitting = signal(false);
+  protected readonly submitError = signal<string | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     firstName: ['', Validators.required],
@@ -69,13 +68,26 @@ export class ContactDialog {
     }
 
     const value = this.form.getRawValue();
-    this.dialogRef.close({
+    const newContact: NewContact = {
       ...value,
       firstName: value.firstName.trim(),
       surname: value.surname.trim(),
       address: value.address.trim(),
       phoneNumber: value.phoneNumber.trim(),
       iban: value.iban.replaceAll(' ', '').toUpperCase(),
+    };
+
+    this.submitting.set(true);
+    this.submitError.set(null);
+    this.contactsService.create(newContact).subscribe({
+      next: (contact) => {
+        this.submitting.set(false);
+        this.dialogRef.close(contact);
+      },
+      error: (error) => {
+        this.submitting.set(false);
+        this.submitError.set(readableSubmitError(error));
+      },
     });
   }
 }
@@ -86,18 +98,41 @@ export class ContactDialog {
   templateUrl: './app.html',
 })
 export class App {
+  private readonly contactsService = inject(ContactsService);
   private readonly dialog = inject(MatDialog);
 
-  protected readonly contacts = signal<Contact[]>(SAMPLE_CONTACTS);
+  protected readonly contacts = signal<Contact[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly loadError = signal<string | null>(null);
   protected readonly contactCount = computed(() => this.contacts().length);
+  protected readonly empty = computed(() => !this.loading() && !this.loadError() && this.contacts().length === 0);
   protected readonly displayedColumns = ['contact', 'dateOfBirth', 'address', 'phoneNumber', 'iban'];
+
+  constructor() {
+    this.loadContacts();
+  }
+
+  protected loadContacts(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.contactsService.list().subscribe({
+      next: (contacts) => {
+        this.contacts.set(contacts);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loadError.set(LOAD_ERROR_MESSAGE);
+        this.loading.set(false);
+      },
+    });
+  }
 
   protected openCreateDialog(): void {
     this.dialog.open(ContactDialog, { width: '640px', maxWidth: 'calc(100vw - 32px)' })
       .afterClosed()
       .subscribe((contact) => {
         if (contact) {
-          this.contacts.update((contacts) => [...contacts, { id: crypto.randomUUID(), ...contact }]);
+          this.contacts.update((contacts) => [...contacts, contact]);
         }
       });
   }
