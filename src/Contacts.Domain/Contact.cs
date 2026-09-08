@@ -10,6 +10,15 @@ public sealed class Contact
     public string PhoneNumber { get; private set; }
     public Iban Iban { get; private set; }
 
+    private Contact()
+    {
+        FirstName = null!;
+        Surname = null!;
+        Address = null!;
+        PhoneNumber = null!;
+        Iban = null!;
+    }
+
     public Contact(
         string firstName,
         string surname,
