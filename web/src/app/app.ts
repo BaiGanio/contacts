@@ -1,12 +1,17 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
+import { debounceTime } from 'rxjs';
 import { Contact, ContactsService, NewContact } from './contacts.service';
+
+const DEFAULT_PAGE_SIZE = 20;
 
 const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
 
@@ -94,7 +99,15 @@ export class ContactDialog {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe, MatButtonModule, MatTableModule],
+  imports: [
+    DatePipe,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatPaginatorModule,
+    MatTableModule,
+    ReactiveFormsModule,
+  ],
   templateUrl: './app.html',
 })
 export class App {
@@ -102,11 +115,16 @@ export class App {
   private readonly dialog = inject(MatDialog);
 
   protected readonly contacts = signal<Contact[]>([]);
+  protected readonly totalCount = signal(0);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly contactCount = computed(() => this.contacts().length);
   protected readonly empty = computed(() => !this.loading() && !this.loadError() && this.contacts().length === 0);
   protected readonly displayedColumns = ['contact', 'dateOfBirth', 'address', 'phoneNumber', 'iban'];
+
+  protected readonly pageIndex = signal(0);
+  protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
+  protected readonly search = signal('');
+  protected readonly searchControl = new FormControl('', { nonNullable: true });
 
   protected readonly importing = signal(false);
   protected readonly importMessage = signal<string | null>(null);
@@ -114,21 +132,35 @@ export class App {
 
   constructor() {
     this.loadContacts();
+    this.searchControl.valueChanges.pipe(debounceTime(300), takeUntilDestroyed()).subscribe((value) => {
+      this.pageIndex.set(0);
+      this.search.set(value);
+      this.loadContacts();
+    });
   }
 
   protected loadContacts(): void {
     this.loading.set(true);
     this.loadError.set(null);
-    this.contactsService.list().subscribe({
-      next: (contacts) => {
-        this.contacts.set(contacts);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loadError.set(LOAD_ERROR_MESSAGE);
-        this.loading.set(false);
-      },
-    });
+    this.contactsService
+      .list({ page: this.pageIndex() + 1, pageSize: this.pageSize(), search: this.search() })
+      .subscribe({
+        next: (page) => {
+          this.contacts.set(page.contacts);
+          this.totalCount.set(page.totalCount);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loadError.set(LOAD_ERROR_MESSAGE);
+          this.loading.set(false);
+        },
+      });
+  }
+
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+    this.loadContacts();
   }
 
   protected importFile(input: HTMLInputElement): void {
@@ -151,6 +183,7 @@ export class App {
           return;
         }
         this.importMessage.set(`Imported ${result.importedCount} contact(s).`);
+        this.pageIndex.set(0);
         this.loadContacts();
       },
       error: (error) => {
@@ -165,7 +198,7 @@ export class App {
       .afterClosed()
       .subscribe((contact) => {
         if (contact) {
-          this.contacts.update((contacts) => [...contacts, contact]);
+          this.loadContacts();
         }
       });
   }

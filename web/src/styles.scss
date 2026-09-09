@@ -9,6 +9,7 @@ body { font-family: Roboto, Arial, sans-serif; margin: 0; min-width: 320px; }
 .count { color: rgba(0, 0, 0, 0.6); margin: 0 0 16px; }
 .status { color: rgba(0, 0, 0, 0.6); margin: 0 0 8px; }
 .status-error { color: #b00020; }
+.search-field { display: block; margin-bottom: 8px; max-width: 360px; width: 100%; }
 .table-scroll { border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; overflow-x: auto; }
 table { min-width: 960px; width: 100%; }
 code { white-space: nowrap; }

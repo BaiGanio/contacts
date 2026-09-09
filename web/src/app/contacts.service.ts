@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
@@ -34,6 +34,22 @@ interface ApiContact {
   iban: { value: string };
 }
 
+interface ApiPagedContacts {
+  items: ApiContact[];
+  totalCount: number;
+}
+
+export interface ContactsPage {
+  contacts: Contact[];
+  totalCount: number;
+}
+
+export interface ContactsQuery {
+  page: number;
+  pageSize: number;
+  search: string;
+}
+
 function toContact(apiContact: ApiContact): Contact {
   return {
     id: apiContact.id,
@@ -56,8 +72,18 @@ export class ContactsService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = 'http://localhost:5187/api/contacts';
 
-  list(): Observable<Contact[]> {
-    return this.http.get<ApiContact[]>(this.baseUrl).pipe(map((contacts) => contacts.map(toContact)));
+  list(query: ContactsQuery): Observable<ContactsPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.search.trim()) {
+      params = params.set('search', query.search.trim());
+    }
+
+    return this.http.get<ApiPagedContacts>(this.baseUrl, { params }).pipe(
+      map((page) => ({
+        contacts: page.items.map(toContact),
+        totalCount: page.totalCount,
+      })),
+    );
   }
 
   create(contact: NewContact): Observable<Contact> {

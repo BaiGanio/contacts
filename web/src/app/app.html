@@ -17,13 +17,20 @@
     <p class="status status-error">{{ importError() }}</p>
   }
 
-  <p class="count">{{ contactCount() }} contacts</p>
+  <mat-form-field appearance="outline" class="search-field">
+    <mat-label>Search by name</mat-label>
+    <input matInput [formControl]="searchControl" placeholder="First name or surname" />
+  </mat-form-field>
+
+  <p class="count">{{ totalCount() }} contacts</p>
 
   @if (loading()) {
     <p class="status">Loading contacts...</p>
   } @else if (loadError()) {
     <p class="status status-error">{{ loadError() }}</p>
     <button mat-button type="button" (click)="loadContacts()">Try again</button>
+  } @else if (empty() && search()) {
+    <p class="status">No contacts match "{{ search() }}".</p>
   } @else if (empty()) {
     <p class="status">No contacts yet. Add one to get started.</p>
   } @else {
@@ -53,5 +60,12 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
       </table>
     </div>
+    <mat-paginator
+      [length]="totalCount()"
+      [pageSize]="pageSize()"
+      [pageIndex]="pageIndex()"
+      [pageSizeOptions]="[10, 20, 50, 100]"
+      (page)="onPage($event)"
+    ></mat-paginator>
   }
 </main>
