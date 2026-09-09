@@ -4,6 +4,9 @@
 
 body { font-family: Roboto, Arial, sans-serif; margin: 0; min-width: 320px; }
 .content { margin: 0 auto; max-width: 1240px; padding: 32px 24px; }
+.auth-bar { align-items: center; display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 8px; }
+.auth-bar .token-field { margin-bottom: -1.25em; min-width: 320px; }
+.auth-status { color: rgba(0, 0, 0, 0.6); font-size: 14px; }
 .page-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
 .page-heading h1 { font-size: 24px; font-weight: 500; margin: 0; }
 .count { color: rgba(0, 0, 0, 0.6); margin: 0 0 16px; }
@@ -24,6 +27,8 @@ code { white-space: nowrap; }
 
 @media (max-width: 700px) {
   .content { padding: 24px 16px; }
+  .auth-bar { flex-wrap: wrap; justify-content: start; }
+  .auth-bar .token-field { min-width: 0; width: 100%; }
   .page-heading { align-items: start; flex-direction: column; gap: 12px; }
   .contact-form { grid-template-columns: 1fr; }
 }

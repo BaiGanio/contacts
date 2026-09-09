@@ -9,13 +9,21 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { debounceTime } from 'rxjs';
+import { AuthService } from './auth.service';
 import { Contact, ContactsService, NewContact } from './contacts.service';
 
 const DEFAULT_PAGE_SIZE = 20;
 
 const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
 
+function isUnauthorized(error: unknown): boolean {
+  return (error as { status?: number })?.status === 401;
+}
+
 function readableSubmitError(error: unknown): string {
+  if (isUnauthorized(error)) {
+    return 'Not authenticated. Log in at the top of the page, then try again.';
+  }
   if (error instanceof ProgressEvent || (error as { status?: number })?.status === 0) {
     return 'Could not reach the server. Check that the API is running, then try again.';
   }
@@ -112,6 +120,7 @@ export class ContactDialog {
 })
 export class App {
   private readonly contactsService = inject(ContactsService);
+  private readonly authService = inject(AuthService);
   private readonly dialog = inject(MatDialog);
 
   protected readonly contacts = signal<Contact[]>([]);
@@ -129,6 +138,10 @@ export class App {
   protected readonly importing = signal(false);
   protected readonly importMessage = signal<string | null>(null);
   protected readonly importError = signal<string | null>(null);
+
+  protected readonly authToken = this.authService.token;
+  protected readonly unauthorized = signal(false);
+  protected readonly tokenControl = new FormControl('', { nonNullable: true });
 
   constructor() {
     this.loadContacts();
@@ -149,12 +162,32 @@ export class App {
           this.contacts.set(page.contacts);
           this.totalCount.set(page.totalCount);
           this.loading.set(false);
+          this.unauthorized.set(false);
         },
-        error: () => {
-          this.loadError.set(LOAD_ERROR_MESSAGE);
+        error: (error) => {
           this.loading.set(false);
+          if (isUnauthorized(error)) {
+            this.unauthorized.set(true);
+          } else {
+            this.loadError.set(LOAD_ERROR_MESSAGE);
+          }
         },
       });
+  }
+
+  protected logIn(): void {
+    const token = this.tokenControl.value.trim();
+    if (!token) {
+      return;
+    }
+    this.authService.setToken(token);
+    this.tokenControl.reset();
+    this.loadContacts();
+  }
+
+  protected logOut(): void {
+    this.authService.clearToken();
+    this.loadContacts();
   }
 
   protected onPage(event: PageEvent): void {

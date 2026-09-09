@@ -1,4 +1,21 @@
 <main class="content">
+  <div class="auth-bar">
+    @if (authToken()) {
+      <span class="auth-status">Authenticated</span>
+      <button mat-button type="button" (click)="logOut()">Log out</button>
+    } @else {
+      <mat-form-field appearance="outline" class="token-field">
+        <mat-label>Auth token</mat-label>
+        <input matInput [formControl]="tokenControl" placeholder="Paste a token from /api/auth/token" />
+      </mat-form-field>
+      <button mat-button type="button" [disabled]="!tokenControl.value.trim()" (click)="logIn()">Log in</button>
+    }
+  </div>
+
+  @if (unauthorized()) {
+    <p class="status status-error">Not authenticated. Paste a valid token above, then log in.</p>
+  }
+
   <header class="page-heading">
     <h1>Contacts</h1>
     <div class="page-actions">
