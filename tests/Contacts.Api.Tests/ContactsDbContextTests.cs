@@ -21,7 +21,7 @@ public sealed class ContactsDbContextTests
             await using (var writeContext = new ContactsDbContext(options))
             {
                 await writeContext.Database.MigrateAsync();
-                Assert.Equal(5, await writeContext.Contacts.CountAsync());
+                Assert.Equal(0, await writeContext.Contacts.CountAsync());
 
                 var createdContact = new Contact(
                     "Ada",

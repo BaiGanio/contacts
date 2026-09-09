@@ -149,23 +149,7 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
 
         try
         {
-            var dateOfBirthRaw = csv.GetField("DateOfBirth") ?? "";
-            if (!DateOnly.TryParseExact(dateOfBirthRaw, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateOfBirth))
-            {
-                throw new FormatException($"'{dateOfBirthRaw}' is not a valid date of birth. Use yyyy-MM-dd.");
-            }
-
-            var address = $"{csv.GetField("Street")}, {csv.GetField("PostalCode")} {csv.GetField("City")}, {csv.GetField("Country")}";
-
-            var contact = new Contact(
-                csv.GetField("FirstName") ?? "",
-                csv.GetField("Surname") ?? "",
-                dateOfBirth,
-                address,
-                csv.GetField("Phone") ?? "",
-                new Iban(csv.GetField("Iban") ?? ""));
-
-            contacts.Add(contact);
+            contacts.Add(ContactCsvRow.Parse(name => csv.GetField(name)));
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException)
         {
@@ -188,6 +172,13 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
 if (authEnabled)
 {
     importContacts.RequireAuthorization();
+}
+
+using (var seedScope = app.Services.CreateScope())
+{
+    var dbContext = seedScope.ServiceProvider.GetRequiredService<ContactsDbContext>();
+    var seedCsvPath = Path.Combine(app.Environment.ContentRootPath, "..", "..", "seed-data", "contacts-02-poc-300.csv");
+    await ContactsSeeder.SeedFromCsvAsync(dbContext, seedCsvPath, app.Logger);
 }
 
 app.Run();
