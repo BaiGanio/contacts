@@ -6,14 +6,17 @@ public sealed record Iban
 
     public Iban(string value)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("The IBAN is required.");
+        }
 
         var normalizedValue = string.Concat(value.Where(character => !char.IsWhiteSpace(character)))
             .ToUpperInvariant();
 
         if (!HasValidFormat(normalizedValue) || !HasValidChecksum(normalizedValue))
         {
-            throw new ArgumentException("The IBAN is invalid.", nameof(value));
+            throw new ArgumentException("The IBAN is invalid.");
         }
 
         Value = normalizedValue;
