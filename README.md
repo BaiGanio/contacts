@@ -41,8 +41,12 @@ dotnet ef database update --project src/Contacts.Api
 This creates `src/Contacts.Api/contacts.db`. The database file and its SQLite
 sidecar files are local development output and are intentionally ignored by
 Git. The migrations and SQLite configuration remain checked in, so every
-developer can create the same database locally. A fresh database contains the
-five contacts from `seed-data/contacts-01-initial-5.csv`.
+developer can create the same database locally. The migrations themselves
+create only an empty table. The first time the API starts against an empty
+database, it seeds the 300 contacts from
+`seed-data/contacts-02-poc-300.csv`, validating each row through the same
+domain rules as a normal create (invalid rows are skipped and logged, not
+inserted).
 
 When the EF model intentionally changes, create a migration from the repository
 root and then apply it:
@@ -94,7 +98,7 @@ npm run build
 npm test -- --no-watch
 ```
 
-Read the five seeded contacts directly with:
+Read the seeded contacts directly with:
 
 ```sh
 curl http://localhost:5187/api/contacts
