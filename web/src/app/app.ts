@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,13 +8,22 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
+import { Store } from '@ngrx/store';
 import { debounceTime } from 'rxjs';
 import { AuthService } from './auth.service';
+import { ContactsActions } from './contacts.actions';
+import {
+  selectContacts,
+  selectIsEmpty,
+  selectLoadError,
+  selectLoading,
+  selectPageIndex,
+  selectPageSize,
+  selectSearch,
+  selectTotalCount,
+  selectUnauthorized,
+} from './contacts.selectors';
 import { Contact, ContactsService, NewContact } from './contacts.service';
-
-const DEFAULT_PAGE_SIZE = 20;
-
-const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
 
 function isUnauthorized(error: unknown): boolean {
   return (error as { status?: number })?.status === 401;
@@ -122,17 +131,18 @@ export class App {
   private readonly contactsService = inject(ContactsService);
   private readonly authService = inject(AuthService);
   private readonly dialog = inject(MatDialog);
+  private readonly store = inject(Store);
 
-  protected readonly contacts = signal<Contact[]>([]);
-  protected readonly totalCount = signal(0);
-  protected readonly loading = signal(true);
-  protected readonly loadError = signal<string | null>(null);
-  protected readonly empty = computed(() => !this.loading() && !this.loadError() && this.contacts().length === 0);
+  protected readonly contacts = this.store.selectSignal(selectContacts);
+  protected readonly totalCount = this.store.selectSignal(selectTotalCount);
+  protected readonly loading = this.store.selectSignal(selectLoading);
+  protected readonly loadError = this.store.selectSignal(selectLoadError);
+  protected readonly empty = this.store.selectSignal(selectIsEmpty);
   protected readonly displayedColumns = ['contact', 'dateOfBirth', 'address', 'phoneNumber', 'iban'];
 
-  protected readonly pageIndex = signal(0);
-  protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
-  protected readonly search = signal('');
+  protected readonly pageIndex = this.store.selectSignal(selectPageIndex);
+  protected readonly pageSize = this.store.selectSignal(selectPageSize);
+  protected readonly search = this.store.selectSignal(selectSearch);
   protected readonly searchControl = new FormControl('', { nonNullable: true });
 
   protected readonly importing = signal(false);
@@ -140,39 +150,18 @@ export class App {
   protected readonly importError = signal<string | null>(null);
 
   protected readonly authToken = this.authService.token;
-  protected readonly unauthorized = signal(false);
+  protected readonly unauthorized = this.store.selectSignal(selectUnauthorized);
   protected readonly tokenControl = new FormControl('', { nonNullable: true });
 
   constructor() {
-    this.loadContacts();
+    this.store.dispatch(ContactsActions.loadContacts());
     this.searchControl.valueChanges.pipe(debounceTime(300), takeUntilDestroyed()).subscribe((value) => {
-      this.pageIndex.set(0);
-      this.search.set(value);
-      this.loadContacts();
+      this.store.dispatch(ContactsActions.setSearch({ search: value }));
     });
   }
 
   protected loadContacts(): void {
-    this.loading.set(true);
-    this.loadError.set(null);
-    this.contactsService
-      .list({ page: this.pageIndex() + 1, pageSize: this.pageSize(), search: this.search() })
-      .subscribe({
-        next: (page) => {
-          this.contacts.set(page.contacts);
-          this.totalCount.set(page.totalCount);
-          this.loading.set(false);
-          this.unauthorized.set(false);
-        },
-        error: (error) => {
-          this.loading.set(false);
-          if (isUnauthorized(error)) {
-            this.unauthorized.set(true);
-          } else {
-            this.loadError.set(LOAD_ERROR_MESSAGE);
-          }
-        },
-      });
+    this.store.dispatch(ContactsActions.loadContacts());
   }
 
   protected logIn(): void {
@@ -191,9 +180,7 @@ export class App {
   }
 
   protected onPage(event: PageEvent): void {
-    this.pageIndex.set(event.pageIndex);
-    this.pageSize.set(event.pageSize);
-    this.loadContacts();
+    this.store.dispatch(ContactsActions.setPage({ pageIndex: event.pageIndex, pageSize: event.pageSize }));
   }
 
   protected importFile(input: HTMLInputElement): void {
@@ -216,8 +203,7 @@ export class App {
           return;
         }
         this.importMessage.set(`Imported ${result.importedCount} contact(s).`);
-        this.pageIndex.set(0);
-        this.loadContacts();
+        this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
       },
       error: (error) => {
         this.importing.set(false);
