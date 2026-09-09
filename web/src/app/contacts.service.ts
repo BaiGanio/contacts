@@ -14,6 +14,7 @@ export interface Contact {
 }
 
 export type NewContact = Omit<Contact, 'id'>;
+export type ContactEdits = Omit<Contact, 'id'>;
 
 export interface ImportRowError {
   row: number;
@@ -97,6 +98,22 @@ export class ContactsService {
     return this.http
       .post<ApiContact>(this.baseUrl, contact, { headers: this.authHeaders() })
       .pipe(map(toContact));
+  }
+
+  getById(id: string): Observable<Contact> {
+    return this.http
+      .get<ApiContact>(`${this.baseUrl}/${id}`, { headers: this.authHeaders() })
+      .pipe(map(toContact));
+  }
+
+  update(id: string, edits: ContactEdits): Observable<Contact> {
+    return this.http
+      .put<ApiContact>(`${this.baseUrl}/${id}`, edits, { headers: this.authHeaders() })
+      .pipe(map(toContact));
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}`, { headers: this.authHeaders() });
   }
 
   import(file: File): Observable<ImportResult> {
