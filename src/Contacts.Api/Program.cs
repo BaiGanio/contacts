@@ -2,9 +2,16 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Contacts.Api.Contacts;
+using Contacts.Api.Contacts.CreateContact;
+using Contacts.Api.Contacts.DeleteContact;
+using Contacts.Api.Contacts.GetContact;
+using Contacts.Api.Contacts.GetContacts;
+using Contacts.Api.Contacts.UpdateContact;
 using Contacts.Api.Data;
 using Contacts.Domain;
 using CsvHelper;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -23,9 +30,19 @@ var signingKey = builder.Configuration["Auth:SigningKey"]
     ?? throw new InvalidOperationException("Configuration value 'Auth:SigningKey' was not found.");
 var signingCredentials = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
 
+ValidatorOptions.Global.LanguageManager.Enabled = false;
+
 builder.Services.AddDbContext<ContactsDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddScoped<IValidator<CreateContactCommand>, CreateContactCommandValidator>();
+builder.Services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
+builder.Services.AddScoped<CreateContactHandler>();
+builder.Services.AddScoped<GetContactsHandler>();
+builder.Services.AddScoped<GetContactHandler>();
+builder.Services.AddScoped<UpdateContactHandler>();
+builder.Services.AddScoped<DeleteContactHandler>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(AngularDevClient, policy =>
@@ -85,52 +102,7 @@ if (authEnabled)
 
 app.MapGet("/", () => "Hello World!");
 
-var getContacts = app.MapGet("/api/contacts", async (
-    ContactsDbContext dbContext,
-    int page = 1,
-    int pageSize = 20,
-    string? search = null) =>
-{
-    page = Math.Max(page, 1);
-    pageSize = Math.Clamp(pageSize, 1, 100);
-
-    var query = dbContext.Contacts.AsNoTracking();
-
-    if (!string.IsNullOrWhiteSpace(search))
-    {
-        var pattern = $"%{search.Trim()}%";
-        query = query.Where(contact =>
-            EF.Functions.Like(contact.FirstName, pattern) ||
-            EF.Functions.Like(contact.Surname, pattern));
-    }
-
-    var totalCount = await query.CountAsync();
-
-    var items = await query
-        .OrderBy(contact => contact.Surname)
-        .ThenBy(contact => contact.FirstName)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .ToListAsync();
-
-    return Results.Ok(new PagedContactsResult(items, totalCount));
-});
-
-var createContact = app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbContext dbContext) =>
-{
-    var contact = new Contact(
-        request.FirstName,
-        request.Surname,
-        request.DateOfBirth,
-        request.Address,
-        request.PhoneNumber,
-        new Iban(request.Iban));
-
-    dbContext.Contacts.Add(contact);
-    await dbContext.SaveChangesAsync();
-
-    return Results.Created($"/api/contacts/{contact.Id}", contact);
-});
+app.MapContactEndpoints(authEnabled);
 
 var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, ContactsDbContext dbContext) =>
 {
@@ -215,24 +187,12 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
 
 if (authEnabled)
 {
-    getContacts.RequireAuthorization();
-    createContact.RequireAuthorization();
     importContacts.RequireAuthorization();
 }
 
 app.Run();
 
 public sealed record LoginRequest(string Username, string Password);
-
-public sealed record CreateContactRequest(
-    string FirstName,
-    string Surname,
-    DateOnly DateOfBirth,
-    string Address,
-    string PhoneNumber,
-    string Iban);
-
-public sealed record PagedContactsResult(IReadOnlyList<Contact> Items, int TotalCount);
 
 public sealed record ImportResult(int ImportedCount, IReadOnlyList<ImportRowError> Errors);
 
