@@ -52,9 +52,99 @@
   --mat-sys-inverse-surface: var(--ledger-ink);
   --mat-sys-inverse-on-surface: #f6f7fb;
   --mat-sys-inverse-primary: #c5cae9;
+
+  --ledger-font: 'Bookman Old Style', Georgia, serif;
+  --mat-sys-body-large-font: var(--ledger-font);
+  --mat-sys-body-medium-font: var(--ledger-font);
+  --mat-sys-body-small-font: var(--ledger-font);
+  --mat-sys-display-large-font: var(--ledger-font);
+  --mat-sys-display-medium-font: var(--ledger-font);
+  --mat-sys-display-small-font: var(--ledger-font);
+  --mat-sys-headline-large-font: var(--ledger-font);
+  --mat-sys-headline-medium-font: var(--ledger-font);
+  --mat-sys-headline-small-font: var(--ledger-font);
+  --mat-sys-label-large-font: var(--ledger-font);
+  --mat-sys-label-medium-font: var(--ledger-font);
+  --mat-sys-label-small-font: var(--ledger-font);
+  --mat-sys-title-large-font: var(--ledger-font);
+  --mat-sys-title-medium-font: var(--ledger-font);
+  --mat-sys-title-small-font: var(--ledger-font);
 }
 
 * { box-sizing: border-box; }
+
+@font-face {
+  font-family: 'AL Sandra';
+  src: url('/AL Sandra.ttf') format('truetype');
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Bookman Old Style';
+  src: url('/BOOKOS.TTF') format('truetype');
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.boot-splash {
+  align-items: center;
+  background: var(--ledger-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  height: 100vh;
+  justify-content: center;
+  left: 0;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  transition: opacity 240ms ease;
+  width: 100%;
+  z-index: 1000;
+}
+.boot-splash.boot-splash-hide {
+  opacity: 0;
+  pointer-events: none;
+}
+.boot-splash__mark {
+  color: var(--ledger-primary);
+  font-family: 'AL Sandra', Georgia, serif;
+  font-size: clamp(48px, 9vw, 130px);
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  margin: 0;
+  max-width: 90vw;
+  padding: 0 24px;
+  text-align: center;
+}
+.boot-splash__rule {
+  background: var(--ledger-rule);
+  border-radius: 3px;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+  width: min(70vw, 420px);
+}
+.boot-splash__rule::after {
+  background: var(--ledger-accent-pink);
+  border-radius: 3px;
+  content: '';
+  height: 100%;
+  position: absolute;
+  width: 40%;
+  animation: boot-sweep 1.1s ease-in-out infinite;
+}
+@keyframes boot-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash__rule::after { animation: none; left: 0; width: 100%; }
+}
 
 html, body {
   background: var(--ledger-bg);
@@ -62,7 +152,7 @@ html, body {
 }
 
 body {
-  font-family: Roboto, Arial, sans-serif;
+  font-family: var(--ledger-font);
   margin: 0;
   min-width: 320px;
 }
@@ -98,7 +188,7 @@ mat-toolbar.app-toolbar {
   width: 1px;
 }
 
-.content { margin: 0 auto; max-width: 1160px; padding: 32px 24px 64px; }
+.content { margin: 0 auto; max-width: 1520px; padding: 32px 24px 64px; }
 
 .count {
   color: var(--ledger-ink-muted);
@@ -147,7 +237,14 @@ mat-toolbar.app-toolbar {
   border-top: 2px solid var(--ledger-rule-strong);
   overflow-x: auto;
 }
-table { min-width: 960px; width: 100%; }
+table { min-width: 1200px; width: 100%; }
+
+th.mat-mdc-header-cell:nth-child(1),
+th.mat-mdc-header-cell:nth-child(2),
+td.mat-mdc-cell:nth-child(1),
+td.mat-mdc-cell:nth-child(2) {
+  white-space: nowrap;
+}
 
 th.mat-mdc-header-cell {
   border-bottom: 1px solid var(--ledger-rule);

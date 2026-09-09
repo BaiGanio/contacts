@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,6 +28,8 @@ import {
   selectUnauthorized,
 } from './contacts.selectors';
 import { Contact, ContactsService, NewContact } from './contacts.service';
+
+const BOOT_SPLASH_MIN_MS = 1500;
 
 function isUnauthorized(error: unknown): boolean {
   return (error as { status?: number })?.status === 401;
@@ -306,10 +308,23 @@ export class App {
   protected readonly unauthorized = this.store.selectSignal(selectUnauthorized);
 
   constructor() {
+    afterNextRender(() => this.dismissBootSplash());
     this.store.dispatch(ContactsActions.loadContacts());
     this.searchControl.valueChanges.pipe(debounceTime(300), takeUntilDestroyed()).subscribe((value) => {
       this.store.dispatch(ContactsActions.setSearch({ search: value }));
     });
+  }
+
+  private dismissBootSplash(): void {
+    const splash = document.getElementById('boot-splash');
+    if (!splash) {
+      return;
+    }
+    const remaining = Math.max(0, BOOT_SPLASH_MIN_MS - performance.now());
+    setTimeout(() => {
+      splash.classList.add('boot-splash-hide');
+      setTimeout(() => splash.remove(), 240);
+    }, remaining);
   }
 
   protected loadContacts(): void {
