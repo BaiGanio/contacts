@@ -15,6 +15,7 @@ body { font-family: Roboto, Arial, sans-serif; margin: 0; min-width: 320px; }
 .search-field { display: block; margin-bottom: 8px; max-width: 360px; width: 100%; }
 .table-scroll { border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; overflow-x: auto; }
 table { min-width: 960px; width: 100%; }
+.actions-cell { text-align: right; white-space: nowrap; }
 code { white-space: nowrap; }
 .contact-form { display: grid; gap: 24px 16px; grid-template-columns: 1fr 1fr; padding-top: 8px; }
 .form-error { color: #b00020; margin: 0 0 8px; }
