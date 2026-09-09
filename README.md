@@ -139,3 +139,30 @@ curl -i http://localhost:5187/api/contacts/import \
 
 The Angular page has an **Import file** button that opens a file picker,
 sends the chosen CSV to this endpoint, and reloads the table on success.
+
+## Dummy token auth proof of concept
+
+This is a proof of concept for reviewers, not real security. It is off by
+default and does not add real user management, password hashing, or roles.
+
+Turn it on by setting `Auth:Enabled` to `true` (for example in
+`appsettings.Development.json` or with `Auth__Enabled=true`). While it is
+`false` (the default), every route behaves exactly as documented above and
+no login is required.
+
+While the flag is on, `/api/contacts` and `/api/contacts/import` require a
+bearer token. Get one from the one hardcoded dummy credential
+(`demo` / `demo`):
+
+```sh
+curl -s -X POST http://localhost:5187/api/auth/token \
+  -H 'Content-Type: application/json' \
+  -d '{"username": "demo", "password": "demo"}'
+```
+
+This returns a short-lived signed JWT: `{"token": "..."}`. Requests without
+a valid token get `401 Unauthorized`. Paste the token into the **Auth
+token** field at the top of the Angular page and click **Log in**; the app
+holds it in `localStorage` and sends it as an `Authorization: Bearer`
+header on every API call. If the flag is on and no token is stored yet,
+the page shows a "Not authenticated" message.

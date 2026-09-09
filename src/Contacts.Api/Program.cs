@@ -1,8 +1,13 @@
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Contacts.Api.Data;
 using Contacts.Domain;
 using CsvHelper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +15,13 @@ var connectionString = builder.Configuration.GetConnectionString("Contacts")
     ?? throw new InvalidOperationException("Connection string 'Contacts' was not found.");
 
 const string AngularDevClient = "AngularDevClient";
+const string DummyUsername = "demo";
+const string DummyPassword = "demo";
+
+var authEnabled = builder.Configuration.GetValue<bool>("Auth:Enabled");
+var signingKey = builder.Configuration["Auth:SigningKey"]
+    ?? throw new InvalidOperationException("Configuration value 'Auth:SigningKey' was not found.");
+var signingCredentials = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
 
 builder.Services.AddDbContext<ContactsDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddEndpointsApiExplorer();
@@ -22,6 +34,24 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 
+if (authEnabled)
+{
+    builder.Services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = signingCredentials,
+            };
+        });
+    builder.Services.AddAuthorization();
+}
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -32,9 +62,30 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors(AngularDevClient);
 
+if (authEnabled)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapPost("/api/auth/token", (LoginRequest request) =>
+    {
+        if (request.Username != DummyUsername || request.Password != DummyPassword)
+        {
+            return Results.Unauthorized();
+        }
+
+        var token = new JwtSecurityToken(
+            claims: [new Claim(ClaimTypes.Name, request.Username)],
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: new SigningCredentials(signingCredentials, SecurityAlgorithms.HmacSha256));
+
+        return Results.Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+    });
+}
+
 app.MapGet("/", () => "Hello World!");
 
-app.MapGet("/api/contacts", async (
+var getContacts = app.MapGet("/api/contacts", async (
     ContactsDbContext dbContext,
     int page = 1,
     int pageSize = 20,
@@ -65,7 +116,7 @@ app.MapGet("/api/contacts", async (
     return Results.Ok(new PagedContactsResult(items, totalCount));
 });
 
-app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbContext dbContext) =>
+var createContact = app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbContext dbContext) =>
 {
     var contact = new Contact(
         request.FirstName,
@@ -81,7 +132,7 @@ app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbCont
     return Results.Created($"/api/contacts/{contact.Id}", contact);
 });
 
-app.MapPost("/api/contacts/import", async (IFormFile file, ContactsDbContext dbContext) =>
+var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, ContactsDbContext dbContext) =>
 {
     const int MaxFileBytes = 1 * 1024 * 1024;
     const int MaxDataRows = 1000;
@@ -162,7 +213,16 @@ app.MapPost("/api/contacts/import", async (IFormFile file, ContactsDbContext dbC
 })
 .DisableAntiforgery();
 
+if (authEnabled)
+{
+    getContacts.RequireAuthorization();
+    createContact.RequireAuthorization();
+    importContacts.RequireAuthorization();
+}
+
 app.Run();
+
+public sealed record LoginRequest(string Username, string Password);
 
 public sealed record CreateContactRequest(
     string FirstName,
