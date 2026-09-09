@@ -5,10 +5,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Store } from '@ngrx/store';
 import { debounceTime } from 'rxjs';
 import { AuthService } from './auth.service';
@@ -32,7 +35,7 @@ function isUnauthorized(error: unknown): boolean {
 
 function readableSubmitError(error: unknown): string {
   if (isUnauthorized(error)) {
-    return 'Not authenticated. Log in at the top of the page, then try again.';
+    return 'Not authenticated. Use the login icon in the top bar, then try again.';
   }
   if (error instanceof ProgressEvent || (error as { status?: number })?.status === 0) {
     return 'Could not reach the server. Check that the API is running, then try again.';
@@ -79,7 +82,7 @@ export interface ContactDialogData {
           <input matInput type="date" formControlName="dateOfBirth" />
           <mat-error>{{ form.get('dateOfBirth')?.getError('server') ?? 'Required' }}</mat-error>
         </mat-form-field>
-        <mat-form-field appearance="outline">
+        <mat-form-field appearance="outline" class="full-width">
           <mat-label>Address</mat-label>
           <input matInput formControlName="address" />
           <mat-error>{{ form.get('address')?.getError('server') ?? 'Required' }}</mat-error>
@@ -220,11 +223,44 @@ export class DeleteConfirmDialog {
         this.deleting.set(false);
         this.error.set(
           isUnauthorized(error)
-            ? 'Not authenticated. Log in at the top of the page, then try again.'
+            ? 'Not authenticated. Use the login icon in the top bar, then try again.'
             : 'Could not delete this contact. Try again.',
         );
       },
     });
+  }
+}
+
+@Component({
+  selector: 'app-auth-dialog',
+  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, ReactiveFormsModule],
+  template: `
+    <h2 mat-dialog-title>Log in</h2>
+    <mat-dialog-content>
+      <p>Paste a token from <code>/api/auth/token</code>.</p>
+      <mat-form-field appearance="outline" class="auth-dialog-field">
+        <mat-label>Auth token</mat-label>
+        <input matInput [formControl]="tokenControl" (keyup.enter)="submit()" />
+      </mat-form-field>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" mat-dialog-close>Cancel</button>
+      <button mat-flat-button type="button" [disabled]="!tokenControl.value.trim()" (click)="submit()">
+        Log in
+      </button>
+    </mat-dialog-actions>
+  `,
+})
+export class AuthDialog {
+  private readonly dialogRef = inject(MatDialogRef<AuthDialog, string>);
+  protected readonly tokenControl = new FormControl('', { nonNullable: true });
+
+  protected submit(): void {
+    const token = this.tokenControl.value.trim();
+    if (!token) {
+      return;
+    }
+    this.dialogRef.close(token);
   }
 }
 
@@ -234,9 +270,12 @@ export class DeleteConfirmDialog {
     DatePipe,
     MatButtonModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
     MatPaginatorModule,
     MatTableModule,
+    MatToolbarModule,
+    MatTooltipModule,
     ReactiveFormsModule,
   ],
   templateUrl: './app.html',
@@ -261,12 +300,10 @@ export class App {
   protected readonly searchControl = new FormControl('', { nonNullable: true });
 
   protected readonly importing = signal(false);
-  protected readonly importMessage = signal<string | null>(null);
   protected readonly importError = signal<string | null>(null);
 
   protected readonly authToken = this.authService.token;
   protected readonly unauthorized = this.store.selectSignal(selectUnauthorized);
-  protected readonly tokenControl = new FormControl('', { nonNullable: true });
 
   constructor() {
     this.store.dispatch(ContactsActions.loadContacts());
@@ -279,14 +316,15 @@ export class App {
     this.store.dispatch(ContactsActions.loadContacts());
   }
 
-  protected logIn(): void {
-    const token = this.tokenControl.value.trim();
-    if (!token) {
-      return;
-    }
-    this.authService.setToken(token);
-    this.tokenControl.reset();
-    this.loadContacts();
+  protected openAuthDialog(): void {
+    this.dialog.open(AuthDialog, { width: '420px', maxWidth: 'calc(100vw - 32px)' })
+      .afterClosed()
+      .subscribe((token) => {
+        if (token) {
+          this.authService.setToken(token);
+          this.loadContacts();
+        }
+      });
   }
 
   protected logOut(): void {
@@ -306,7 +344,6 @@ export class App {
     }
 
     this.importing.set(true);
-    this.importMessage.set(null);
     this.importError.set(null);
     this.contactsService.import(file).subscribe({
       next: (result) => {
@@ -317,7 +354,7 @@ export class App {
           );
           return;
         }
-        this.importMessage.set(`Imported ${result.importedCount} contact(s).`);
+        this.notify(`Imported ${result.importedCount} contact(s).`, 'add');
         this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
       },
       error: (error) => {
@@ -332,7 +369,7 @@ export class App {
       .afterClosed()
       .subscribe((contact) => {
         if (contact) {
-          this.notify(`Added ${contact.firstName} ${contact.surname}.`);
+          this.notify(`Added ${contact.firstName} ${contact.surname}.`, 'add');
           this.loadContacts();
         }
       });
@@ -343,7 +380,7 @@ export class App {
       .afterClosed()
       .subscribe((updated) => {
         if (updated) {
-          this.notify(`Saved changes for ${updated.firstName} ${updated.surname}.`);
+          this.notify(`Saved changes for ${updated.firstName} ${updated.surname}.`, 'update');
           this.loadContacts();
         }
       });
@@ -354,13 +391,13 @@ export class App {
       .afterClosed()
       .subscribe((deleted) => {
         if (deleted) {
-          this.notify(`Deleted ${contact.firstName} ${contact.surname}.`);
+          this.notify(`Deleted ${contact.firstName} ${contact.surname}.`, 'delete');
           this.loadContacts();
         }
       });
   }
 
-  private notify(message: string): void {
-    this.snackBar.open(message, 'Dismiss', { duration: 4000 });
+  private notify(message: string, kind: 'add' | 'update' | 'delete' = 'add'): void {
+    this.snackBar.open(message, 'Dismiss', { duration: 4000, panelClass: `snackbar-${kind}` });
   }
 }

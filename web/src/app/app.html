@@ -1,58 +1,75 @@
+<mat-toolbar class="app-toolbar">
+  <h1>Contacts</h1>
+  <span class="toolbar-spacer"></span>
+  <input #csvInput type="file" accept=".csv" hidden (change)="importFile(csvInput)" />
+  <button
+    mat-icon-button
+    type="button"
+    [disabled]="importing()"
+    (click)="csvInput.click()"
+    aria-label="Import a CSV file"
+    matTooltip="Import CSV"
+  >
+    <mat-icon>{{ importing() ? 'hourglass_top' : 'upload_file' }}</mat-icon>
+  </button>
+  <button
+    mat-icon-button
+    type="button"
+    (click)="openCreateDialog()"
+    aria-label="Add contact"
+    matTooltip="Add contact"
+  >
+    <mat-icon>person_add</mat-icon>
+  </button>
+  <span class="toolbar-divider"></span>
+  @if (authToken()) {
+    <button mat-icon-button type="button" (click)="logOut()" aria-label="Log out" matTooltip="Log out">
+      <mat-icon>logout</mat-icon>
+    </button>
+  } @else {
+    <button
+      mat-icon-button
+      type="button"
+      (click)="openAuthDialog()"
+      aria-label="Log in"
+      matTooltip="Log in"
+      [class.auth-alert]="unauthorized()"
+    >
+      <mat-icon>login</mat-icon>
+    </button>
+  }
+</mat-toolbar>
+
 <main class="content">
-  <div class="auth-bar">
-    @if (authToken()) {
-      <span class="auth-status">Authenticated</span>
-      <button mat-button type="button" (click)="logOut()">Log out</button>
-    } @else {
-      <mat-form-field appearance="outline" class="token-field">
-        <mat-label>Auth token</mat-label>
-        <input matInput [formControl]="tokenControl" placeholder="Paste a token from /api/auth/token" />
-      </mat-form-field>
-      <button mat-button type="button" [disabled]="!tokenControl.value.trim()" (click)="logIn()">Log in</button>
-    }
-  </div>
-
   @if (unauthorized()) {
-    <p class="status status-error">Not authenticated. Paste a valid token above, then log in.</p>
+    <p class="status status-error">Not authenticated. Use the login icon in the top bar, then try again.</p>
   }
 
-  <header class="page-heading">
-    <h1>Contacts</h1>
-    <div class="page-actions">
-      <input #csvInput type="file" accept=".csv" hidden (change)="importFile(csvInput)" />
-      <button mat-button type="button" [disabled]="importing()" (click)="csvInput.click()">
-        {{ importing() ? 'Importing...' : 'Import file' }}
-      </button>
-      <button mat-flat-button type="button" (click)="openCreateDialog()">Add contact</button>
-    </div>
-  </header>
-
-  @if (importMessage()) {
-    <p class="status">{{ importMessage() }}</p>
-  }
   @if (importError()) {
     <p class="status status-error">{{ importError() }}</p>
   }
 
-  <mat-form-field appearance="outline" class="search-field">
-    <mat-label>Search by name</mat-label>
-    <input matInput [formControl]="searchControl" placeholder="First name or surname" />
-  </mat-form-field>
+  <div class="table-panel">
+    <div class="table-toolbar">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [formControl]="searchControl" placeholder="Search by first name or surname" />
+      </mat-form-field>
+      <p class="count">{{ totalCount() }} contact{{ totalCount() === 1 ? '' : 's' }}</p>
+    </div>
 
-  <p class="count">{{ totalCount() }} contacts</p>
-
-  @if (loading()) {
-    <p class="status">Loading contacts...</p>
-  } @else if (loadError()) {
-    <p class="status status-error">{{ loadError() }}</p>
-    <button mat-button type="button" (click)="loadContacts()">Try again</button>
-  } @else if (empty() && search()) {
-    <p class="status">No contacts match "{{ search() }}".</p>
-  } @else if (empty()) {
-    <p class="status">No contacts yet. Add one to get started.</p>
-  } @else {
-    <div class="table-scroll">
-      <table mat-table [dataSource]="contacts()">
+    @if (loading()) {
+      <p class="table-status">Loading contacts...</p>
+    } @else if (loadError()) {
+      <p class="table-status table-status-error">{{ loadError() }}</p>
+      <button mat-button type="button" (click)="loadContacts()">Try again</button>
+    } @else if (empty() && search()) {
+      <p class="table-status">No contacts match "{{ search() }}".</p>
+    } @else if (empty()) {
+      <p class="table-status">No contacts yet. Add one to get started.</p>
+    } @else {
+      <div class="table-scroll">
+        <table mat-table [dataSource]="contacts()">
         <ng-container matColumnDef="contact">
           <th mat-header-cell *matHeaderCellDef>Contact</th>
           <td mat-cell *matCellDef="let contact"><strong>{{ contact.firstName }} {{ contact.surname }}</strong></td>
@@ -76,20 +93,38 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let contact" class="actions-cell">
-            <button mat-button type="button" (click)="openEditDialog(contact)">Edit</button>
-            <button mat-button type="button" (click)="openDeleteDialog(contact)">Delete</button>
+            <button
+              mat-icon-button
+              type="button"
+              (click)="openEditDialog(contact)"
+              [attr.aria-label]="'Edit ' + contact.firstName + ' ' + contact.surname"
+              matTooltip="Edit"
+            >
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              type="button"
+              (click)="openDeleteDialog(contact)"
+              [attr.aria-label]="'Delete ' + contact.firstName + ' ' + contact.surname"
+              matTooltip="Delete"
+              class="delete-action"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
           </td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
       </table>
     </div>
-    <mat-paginator
-      [length]="totalCount()"
-      [pageSize]="pageSize()"
-      [pageIndex]="pageIndex()"
-      [pageSizeOptions]="[10, 20, 50, 100]"
-      (page)="onPage($event)"
-    ></mat-paginator>
-  }
+      <mat-paginator
+        [length]="totalCount()"
+        [pageSize]="pageSize()"
+        [pageIndex]="pageIndex()"
+        [pageSizeOptions]="[10, 20, 50, 100]"
+        (page)="onPage($event)"
+      ></mat-paginator>
+    }
+  </div>
 </main>
