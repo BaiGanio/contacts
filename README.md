@@ -117,6 +117,30 @@ curl -i http://localhost:5187/api/contacts \
   }'
 ```
 
+Invalid fields return a `400` with a readable per-field error list instead of
+saving anything.
+
+Read, edit, and delete one contact by ID:
+
+```sh
+curl http://localhost:5187/api/contacts/<id>
+
+curl -i -X PUT http://localhost:5187/api/contacts/<id> \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "firstName": "Augusta",
+    "surname": "King",
+    "dateOfBirth": "1815-12-10",
+    "address": "13 St James Square, London",
+    "phoneNumber": "+44 20 7946 0001",
+    "iban": "de89 3704 0044 0532 0130 00"
+  }'
+
+curl -i -X DELETE http://localhost:5187/api/contacts/<id>
+```
+
+A missing ID returns `404` for get, edit, and delete.
+
 ## Import contacts from a CSV file
 
 `POST /api/contacts/import` accepts a multipart file upload (field name
@@ -150,8 +174,9 @@ Turn it on by setting `Auth:Enabled` to `true` (for example in
 `false` (the default), every route behaves exactly as documented above and
 no login is required.
 
-While the flag is on, `/api/contacts` and `/api/contacts/import` require a
-bearer token. Get one from the one hardcoded dummy credential
+While the flag is on, every `/api/contacts*` route (list, get, create, edit,
+delete, import) requires a bearer token. Get one from the one hardcoded
+dummy credential
 (`demo` / `demo`):
 
 ```sh
