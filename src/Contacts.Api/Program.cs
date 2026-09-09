@@ -34,10 +34,36 @@ app.UseCors(AngularDevClient);
 
 app.MapGet("/", () => "Hello World!");
 
-app.MapGet("/api/contacts", async (ContactsDbContext dbContext) =>
-    await dbContext.Contacts
-        .AsNoTracking()
-        .ToListAsync());
+app.MapGet("/api/contacts", async (
+    ContactsDbContext dbContext,
+    int page = 1,
+    int pageSize = 20,
+    string? search = null) =>
+{
+    page = Math.Max(page, 1);
+    pageSize = Math.Clamp(pageSize, 1, 100);
+
+    var query = dbContext.Contacts.AsNoTracking();
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        var pattern = $"%{search.Trim()}%";
+        query = query.Where(contact =>
+            EF.Functions.Like(contact.FirstName, pattern) ||
+            EF.Functions.Like(contact.Surname, pattern));
+    }
+
+    var totalCount = await query.CountAsync();
+
+    var items = await query
+        .OrderBy(contact => contact.Surname)
+        .ThenBy(contact => contact.FirstName)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+    return Results.Ok(new PagedContactsResult(items, totalCount));
+});
 
 app.MapPost("/api/contacts", async (CreateContactRequest request, ContactsDbContext dbContext) =>
 {
@@ -145,6 +171,8 @@ public sealed record CreateContactRequest(
     string Address,
     string PhoneNumber,
     string Iban);
+
+public sealed record PagedContactsResult(IReadOnlyList<Contact> Items, int TotalCount);
 
 public sealed record ImportResult(int ImportedCount, IReadOnlyList<ImportRowError> Errors);
 
