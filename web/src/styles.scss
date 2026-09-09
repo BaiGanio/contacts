@@ -326,12 +326,17 @@ code {
 .mat-mdc-snack-bar-container.snackbar-delete .mdc-snackbar__surface {
   background-color: #c62828 !important;
 }
+.mat-mdc-snack-bar-container.snackbar-warn .mdc-snackbar__surface {
+  background-color: #ed6c02 !important;
+}
 .mat-mdc-snack-bar-container.snackbar-add .mdc-snackbar__label,
 .mat-mdc-snack-bar-container.snackbar-update .mdc-snackbar__label,
 .mat-mdc-snack-bar-container.snackbar-delete .mdc-snackbar__label,
+.mat-mdc-snack-bar-container.snackbar-warn .mdc-snackbar__label,
 .mat-mdc-snack-bar-container.snackbar-add .mat-mdc-snack-bar-action,
 .mat-mdc-snack-bar-container.snackbar-update .mat-mdc-snack-bar-action,
-.mat-mdc-snack-bar-container.snackbar-delete .mat-mdc-snack-bar-action {
+.mat-mdc-snack-bar-container.snackbar-delete .mat-mdc-snack-bar-action,
+.mat-mdc-snack-bar-container.snackbar-warn .mat-mdc-snack-bar-action {
   color: #ffffff !important;
 }
 

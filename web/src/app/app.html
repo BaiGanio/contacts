@@ -6,9 +6,9 @@
     mat-icon-button
     type="button"
     [disabled]="importing()"
-    (click)="csvInput.click()"
+    (click)="triggerImport(csvInput)"
     aria-label="Import a CSV file"
-    matTooltip="Import CSV"
+    [matTooltip]="authToken() ? 'Import CSV' : 'Log in to import CSV'"
   >
     <mat-icon>{{ importing() ? 'hourglass_top' : 'upload_file' }}</mat-icon>
   </button>
@@ -17,7 +17,7 @@
     type="button"
     (click)="openCreateDialog()"
     aria-label="Add contact"
-    matTooltip="Add contact"
+    [matTooltip]="authToken() ? 'Add contact' : 'Log in to add a contact'"
   >
     <mat-icon>person_add</mat-icon>
   </button>
@@ -98,7 +98,7 @@
               type="button"
               (click)="openEditDialog(contact)"
               [attr.aria-label]="'Edit ' + contact.firstName + ' ' + contact.surname"
-              matTooltip="Edit"
+              [matTooltip]="authToken() ? 'Edit' : 'Log in to edit'"
             >
               <mat-icon>edit</mat-icon>
             </button>
@@ -107,7 +107,7 @@
               type="button"
               (click)="openDeleteDialog(contact)"
               [attr.aria-label]="'Delete ' + contact.firstName + ' ' + contact.surname"
-              matTooltip="Delete"
+              [matTooltip]="authToken() ? 'Delete' : 'Log in to delete'"
               class="delete-action"
             >
               <mat-icon>delete</mat-icon>

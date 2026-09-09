@@ -331,6 +331,14 @@ export class App {
     this.store.dispatch(ContactsActions.loadContacts());
   }
 
+  private requireAuth(): boolean {
+    if (this.authToken()) {
+      return true;
+    }
+    this.notify('Log in to make changes. Use the login icon in the top bar.', 'warn');
+    return false;
+  }
+
   protected openAuthDialog(): void {
     this.dialog.open(AuthDialog, { width: '420px', maxWidth: 'calc(100vw - 32px)' })
       .afterClosed()
@@ -347,6 +355,13 @@ export class App {
     this.loadContacts();
   }
 
+  protected triggerImport(input: HTMLInputElement): void {
+    if (!this.requireAuth()) {
+      return;
+    }
+    input.click();
+  }
+
   protected onPage(event: PageEvent): void {
     this.store.dispatch(ContactsActions.setPage({ pageIndex: event.pageIndex, pageSize: event.pageSize }));
   }
@@ -355,6 +370,9 @@ export class App {
     const file = input.files?.[0];
     input.value = '';
     if (!file) {
+      return;
+    }
+    if (!this.requireAuth()) {
       return;
     }
 
@@ -380,6 +398,9 @@ export class App {
   }
 
   protected openCreateDialog(): void {
+    if (!this.requireAuth()) {
+      return;
+    }
     this.dialog.open(ContactDialog, { width: '640px', maxWidth: 'calc(100vw - 32px)', data: {} })
       .afterClosed()
       .subscribe((contact) => {
@@ -391,6 +412,9 @@ export class App {
   }
 
   protected openEditDialog(contact: Contact): void {
+    if (!this.requireAuth()) {
+      return;
+    }
     this.dialog.open(ContactDialog, { width: '640px', maxWidth: 'calc(100vw - 32px)', data: { contact } })
       .afterClosed()
       .subscribe((updated) => {
@@ -402,6 +426,9 @@ export class App {
   }
 
   protected openDeleteDialog(contact: Contact): void {
+    if (!this.requireAuth()) {
+      return;
+    }
     this.dialog.open(DeleteConfirmDialog, { width: '420px', maxWidth: 'calc(100vw - 32px)', data: { contact } })
       .afterClosed()
       .subscribe((deleted) => {
@@ -412,7 +439,7 @@ export class App {
       });
   }
 
-  private notify(message: string, kind: 'add' | 'update' | 'delete' = 'add'): void {
+  private notify(message: string, kind: 'add' | 'update' | 'delete' | 'warn' = 'add'): void {
     this.snackBar.open(message, 'Dismiss', { duration: 4000, panelClass: `snackbar-${kind}` });
   }
 }

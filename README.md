@@ -191,3 +191,14 @@ token** field at the top of the Angular page and click **Log in**; the app
 holds it in `localStorage` and sends it as an `Authorization: Bearer`
 header on every API call. If the flag is on and no token is stored yet,
 the page shows a "Not authenticated" message.
+
+### Frontend write gating
+
+The Angular page treats itself as read-only until a token is logged in,
+regardless of the `Auth:Enabled` value on the API (the frontend has no way
+to read that flag). Searching and browsing contacts always work with no
+token. The add, edit, delete, and CSV import buttons stay clickable, but
+each one checks `AuthService.token` first: with no token, it shows a
+snackbar ("Log in to make changes...") instead of opening a dialog or
+sending a request. Logging in through the existing token dialog unlocks
+all of them immediately, no reload needed.
