@@ -1,0 +1,34 @@
+# Applied directly to flux-system (bootstrap-only, like BGAPI's and Keycloak's
+# GitRepository/Kustomization pairs — neither is itself git-tracked as a Flux-reconciled
+# resource, both applied by hand once).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: contacts
+  namespace: flux-system
+spec:
+  interval: 5m
+  # Public GitHub repo, so cloning needs no secretRef. ImageUpdateAutomation still needs
+  # push (write) access to commit resolved image tags back to master — see
+  # image-automation.yaml and README.md's bootstrap section for contacts-git-credentials.
+  url: https://github.com/BaiGanio/contacts.git
+  ref:
+    branch: master
+  secretRef:
+    name: contacts-git-credentials
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: contacts
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./Infrastructure/Kubernetes/Contacts
+  sourceRef:
+    kind: GitRepository
+    name: contacts
+  targetNamespace: contacts
+  prune: true
+  wait: true
+  timeout: 3m

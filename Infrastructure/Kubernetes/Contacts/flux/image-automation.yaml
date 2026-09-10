@@ -1,0 +1,57 @@
+# Reuses the image-reflector-controller / image-automation-controller pair already
+# running in flux-system for BGAPI (see BGAPI's Infrastructure/Kubernetes/BGAPI/README.md).
+# Same end state: deployed image is always a pinned digest, and git tracks what's live.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  # Public package (no pull secret needed for kubelet or for Flux to scan tags).
+  image: ghcr.io/baiganio/contacts-api
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  imageRepositoryRef:
+    name: contacts-api
+  policy:
+    semver:
+      range: ">=0.0.0"
+  # Resolves the winning semver tag's digest too, so the setter below can pin
+  # "tag@digest" in one shot. IfNotPresent: each vX.Y.Z tag from the GitHub Actions
+  # workflow is built and pushed exactly once and never overwritten.
+  digestReflectionPolicy: IfNotPresent
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: contacts
+    namespace: flux-system
+  git:
+    checkout:
+      ref:
+        branch: master
+    commit:
+      author:
+        name: contacts-flux-bot
+        email: contacts-deploy@baiganio.io
+      # [skip ci]: without this every image bump would also retrigger deploy-pages.yml
+      # (it triggers on any push to master) for a commit that only touches a manifest.
+      messageTemplate: |
+        chore(deploy): bump contacts-api image to {{range .Changed.Changes}}{{println .}}{{end}} [skip ci]
+    push:
+      branch: master
+  update:
+    path: ./Infrastructure/Kubernetes/Contacts
+    strategy: Setters

@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Built by Flux's kustomize-controller (see flux/git-source.yaml) against this same
+# directory in git, with prune: true.
+resources:
+  - contacts.yaml

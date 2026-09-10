@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contacts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: contacts
+spec:
+  clusterIP: None
+  selector: {app: postgres}
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: contacts
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: {matchLabels: {app: postgres}}
+  template:
+    metadata: {labels: {app: postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports: [{name: postgres, containerPort: 5432}]
+          env:
+            - {name: POSTGRES_DB, value: contacts}
+            - {name: POSTGRES_USER, value: contacts}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: contacts-runtime, key: postgres-password}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+          # pg_isready is bundled in the postgres image; checks the server accepts
+          # connections without needing a password.
+          readinessProbe: {exec: {command: [pg_isready, -U, contacts]}, initialDelaySeconds: 5, periodSeconds: 10}
+          livenessProbe: {exec: {command: [pg_isready, -U, contacts]}, initialDelaySeconds: 15, periodSeconds: 20}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 256Mi}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec: {accessModes: [ReadWriteOnce], storageClassName: local-path, resources: {requests: {storage: 5Gi}}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  selector: {app: contacts-api}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  # Flux-owned: image-automation-controller commits the resolved "tag@digest" for the
+  # highest published semver tag straight into the line below. Don't hand-edit the image
+  # line — see flux/image-automation.yaml and README.md.
+  replicas: 1
+  selector: {matchLabels: {app: contacts-api}}
+  template:
+    metadata: {labels: {app: contacts-api}}
+    spec:
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: contacts-api
+          # ghcr.io/baiganio/contacts-api is public, so no imagePullSecrets is needed.
+          image: ghcr.io/baiganio/contacts-api:0.1.0 # {"$imagepolicy": "contacts:contacts-api"}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1654
+            runAsGroup: 1654
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          ports: [{name: http, containerPort: 5000}]
+          env:
+            - {name: ASPNETCORE_ENVIRONMENT, value: Production}
+            - {name: ASPNETCORE_URLS, value: 'http://+:5000'}
+            - {name: Database__ApplyMigrations, value: "true"}
+            - {name: Seed__Enabled, value: "false"}
+            - {name: Auth__Enabled, value: "true"}
+            - name: ConnectionStrings__Contacts
+              valueFrom: {secretKeyRef: {name: contacts-runtime, key: contacts-dbconn}}
+            - name: Auth__SigningKey
+              valueFrom: {secretKeyRef: {name: contacts-runtime, key: auth-signing-key}}
+            - name: Auth__Username
+              valueFrom: {secretKeyRef: {name: contacts-runtime, key: auth-username}}
+            - name: Auth__Password
+              valueFrom: {secretKeyRef: {name: contacts-runtime, key: auth-password}}
+          # /health is explicitly [AllowAnonymous] — kubelet sends no bearer token, so a
+          # probe target must be anonymous by intent, not by accident (see BGAPI release
+          # 0.1.2's restart-loop incident for why this matters).
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 15, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 30, periodSeconds: 20}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 256Mi}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: contacts-api
+  namespace: contacts
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: contacts-api.baiganio.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: contacts-api, port: {name: http}}}
