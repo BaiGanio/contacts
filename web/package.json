@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 5186 --open",
+    "start:e2e": "ng serve --port 5196 --configuration e2e",
     "build": "ng build",
     "build:pages": "ng build --base-href /contacts/",
     "watch": "ng build --watch --configuration development",

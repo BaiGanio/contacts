@@ -435,3 +435,12 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Playwright
+# The "Visual Studio Trace Files" rule above (*.e2e) also matches this
+# directory's name on a case-insensitive filesystem (macOS default) -- un-ignore
+# it explicitly, then re-ignore only its generated output.
+!tests/Contacts.E2E/
+tests/Contacts.E2E/test-results/
+tests/Contacts.E2E/playwright-report/
+tests/Contacts.E2E/playwright/.cache/

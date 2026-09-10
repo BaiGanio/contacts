@@ -44,12 +44,17 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddContactServices();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+// https://baiganio.github.io is GitHub Pages serving the built Angular app
+// (web/package.json's build:pages script sets base-href /contacts/ for the org page).
+// Configurable so the Playwright e2e suite can allow its own dev-server origin
+// without touching this default.
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5186", "https://baiganio.github.io"];
+
 builder.Services.AddCors(options =>
 {
-    // https://baiganio.github.io is GitHub Pages serving the built Angular app
-    // (web/package.json's build:pages script sets base-href /contacts/ for the org page).
     options.AddPolicy(AngularClient, policy =>
-        policy.WithOrigins("http://localhost:5186", "https://baiganio.github.io")
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -84,7 +89,11 @@ var importContacts = app.MapPost("/api/contacts/import", async (
 var getImportFailures = app.MapGet("/api/imports/failures", async (
     GetImportFailuresHandler handler,
     CancellationToken cancellationToken,
-    int limit = 100) => Results.Ok(await handler.HandleAsync(limit, cancellationToken)));
+    int limit = 100,
+    string? rowHashes = null) => Results.Ok(await handler.HandleAsync(
+        limit,
+        rowHashes?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        cancellationToken)));
 
 var clearContacts = app.MapDelete("/api/contacts", async (
     ClearContactsHandler handler,
