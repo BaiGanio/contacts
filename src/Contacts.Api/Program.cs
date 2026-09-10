@@ -22,14 +22,16 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Contacts")
     ?? throw new InvalidOperationException("Connection string 'Contacts' was not found.");
 
-const string AngularDevClient = "AngularDevClient";
-const string DummyUsername = "demo";
-const string DummyPassword = "demo";
+const string AngularClient = "AngularClient";
 
 var authEnabled = builder.Configuration.GetValue<bool>("Auth:Enabled");
 var signingKey = builder.Configuration["Auth:SigningKey"]
     ?? throw new InvalidOperationException("Configuration value 'Auth:SigningKey' was not found.");
 var signingCredentials = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
+var authUsername = builder.Configuration["Auth:Username"]
+    ?? throw new InvalidOperationException("Configuration value 'Auth:Username' was not found.");
+var authPassword = builder.Configuration["Auth:Password"]
+    ?? throw new InvalidOperationException("Configuration value 'Auth:Password' was not found.");
 
 ValidatorOptions.Global.LanguageManager.Enabled = false;
 
@@ -50,8 +52,10 @@ builder.Services.AddScoped<UpdateContactHandler>();
 builder.Services.AddScoped<DeleteContactHandler>();
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(AngularDevClient, policy =>
-        policy.WithOrigins("http://localhost:5186")
+    // https://baiganio.github.io is GitHub Pages serving the built Angular app
+    // (web/package.json's build:pages script sets base-href /contacts/ for the org page).
+    options.AddPolicy(AngularClient, policy =>
+        policy.WithOrigins("http://localhost:5186", "https://baiganio.github.io")
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -82,7 +86,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors(AngularDevClient);
+app.UseCors(AngularClient);
+
+// Anonymous by intent, not by accident: kubelet's readiness/liveness probes send no
+// bearer token, and a probe target must not depend on Auth:Enabled being off.
+app.MapGet("/health", () => Results.Ok());
 
 if (authEnabled)
 {
@@ -91,7 +99,7 @@ if (authEnabled)
 
     app.MapPost("/api/auth/token", (LoginRequest request) =>
     {
-        if (request.Username != DummyUsername || request.Password != DummyPassword)
+        if (request.Username != authUsername || request.Password != authPassword)
         {
             return Results.Unauthorized();
         }
