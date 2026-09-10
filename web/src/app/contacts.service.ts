@@ -26,6 +26,21 @@ export interface ImportResult {
   errors: ImportRowError[];
 }
 
+export interface FailedImportRow {
+  rowHash: string;
+  rowNumber: number;
+  rawRow: string;
+  errorMessage: string;
+  firstSeenAtUtc: string;
+  lastSeenAtUtc: string;
+  attempts: number;
+}
+
+export interface FailedImportRows {
+  items: FailedImportRow[];
+  totalCount: number;
+}
+
 interface ApiContact {
   id: string;
   firstName: string;
@@ -120,5 +135,13 @@ export class ContactsService {
     const formData = new FormData();
     formData.append('file', file, file.name);
     return this.http.post<ImportResult>(`${this.baseUrl}/import`, formData, { headers: this.authHeaders() });
+  }
+
+  getImportFailures(limit = 100): Observable<FailedImportRows> {
+    const params = new HttpParams().set('limit', limit);
+    return this.http.get<FailedImportRows>('http://localhost:5187/api/imports/failures', {
+      params,
+      headers: this.authHeaders(),
+    });
   }
 }

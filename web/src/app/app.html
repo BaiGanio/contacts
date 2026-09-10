@@ -8,7 +8,7 @@
     [disabled]="importing()"
     (click)="triggerImport(csvInput)"
     aria-label="Import a CSV file"
-    [matTooltip]="authToken() ? 'Import CSV' : 'Log in to import CSV'"
+    matTooltip="Import CSV"
   >
     <mat-icon>{{ importing() ? 'hourglass_top' : 'upload_file' }}</mat-icon>
   </button>
@@ -17,7 +17,7 @@
     type="button"
     (click)="openCreateDialog()"
     aria-label="Add contact"
-    [matTooltip]="authToken() ? 'Add contact' : 'Log in to add a contact'"
+    matTooltip="Add contact"
   >
     <mat-icon>person_add</mat-icon>
   </button>
@@ -46,7 +46,12 @@
   }
 
   @if (importError()) {
-    <p class="status status-error">{{ importError() }}</p>
+    <p class="status status-error">
+      {{ importError() }}
+      @if (importFailedCount() > 0) {
+        <button mat-button type="button" (click)="openImportFailuresDialog()">View failed rows</button>
+      }
+    </p>
   }
 
   <div class="table-panel">
@@ -98,7 +103,7 @@
               type="button"
               (click)="openEditDialog(contact)"
               [attr.aria-label]="'Edit ' + contact.firstName + ' ' + contact.surname"
-              [matTooltip]="authToken() ? 'Edit' : 'Log in to edit'"
+              matTooltip="Edit"
             >
               <mat-icon>edit</mat-icon>
             </button>
@@ -107,7 +112,7 @@
               type="button"
               (click)="openDeleteDialog(contact)"
               [attr.aria-label]="'Delete ' + contact.firstName + ' ' + contact.surname"
-              [matTooltip]="authToken() ? 'Delete' : 'Log in to delete'"
+              matTooltip="Delete"
               class="delete-action"
             >
               <mat-icon>delete</mat-icon>

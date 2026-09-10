@@ -152,11 +152,39 @@ A missing ID returns `404` for get, edit, and delete.
 (`yyyy-MM-dd`), `Street`, `City`, `PostalCode`, `Country`, `Phone`, and
 `Iban`. The address columns are combined into one string:
 `Street, PostalCode City, Country`. Files over 1 MB or 1,000 data rows are
-rejected. If any row fails validation, the whole file is rejected and no
-rows are saved; the response lists every failing row number and its error.
+rejected outright (nothing is saved).
 
-Importing the same file twice creates duplicate contacts — the IBAN is not
-treated as a unique person identifier.
+Otherwise the import is row-by-row: a row that parses and does not repeat
+an IBAN is saved right away; a row that fails is skipped, listed in the
+response with its row number and error, and recorded in a small review
+queue instead of being silently dropped.
+
+### IBAN is unique
+
+A contact's IBAN must be unique. Creating or editing a contact with an
+IBAN already used by another contact returns a `400` field error on
+`Iban`. During import this same rule applies per row, including two rows
+in the same file sharing an IBAN — the first is saved, the rest are
+skipped as duplicates. This means re-importing the same file a second
+time saves nothing (every row is now a duplicate of what the first import
+already saved) instead of creating duplicate contacts.
+
+### Reviewing failed import rows (PoC)
+
+`GET /api/imports/failures` lists rows that have failed to import: their
+original values, their error message, when they were first and last seen,
+and how many times each has been seen. Rows are deduplicated by their
+exact content, so importing the same bad file ten times updates one
+entry's "seen" count instead of creating ten entries. The response is
+capped (default 100, up to 500, via `?limit=`) and reports `totalCount`
+alongside the returned `items`, so a large backlog of distinct failures
+does not force one huge response or an unreadable page.
+
+After an import with failing rows, the Angular page shows a short summary
+("Imported N, M row(s) failed") with a **View failed rows** button that
+opens a small dialog listing the most recent failures via this endpoint.
+This is a minimal proof of concept — there is no paging control in that
+dialog and no way to clear an entry.
 
 Import one of the fixtures under `seed-data/`:
 
@@ -198,11 +226,12 @@ the page shows a "Not authenticated" message.
 
 ### Frontend write gating
 
-The Angular page treats itself as read-only until a token is logged in,
-regardless of the `Auth:Enabled` value on the API (the frontend has no way
-to read that flag). Searching and browsing contacts always work with no
-token. The add, edit, delete, and CSV import buttons stay clickable, but
-each one checks `AuthService.token` first: with no token, it shows a
-snackbar ("Log in to make changes...") instead of opening a dialog or
-sending a request. Logging in through the existing token dialog unlocks
-all of them immediately, no reload needed.
+The Angular page does not gate anything on its own. Add, edit, delete,
+search, and CSV import are always available from the page, whether or not
+a token is logged in — the frontend has no way to read the API's
+`Auth:Enabled` value, so it does not guess. While the flag is off (the
+default), every action just works, same as before this PoC existed. While
+the flag is on, an action without a valid token gets a `401` from the
+API, and the page shows "Not authenticated. Use the login icon in the top
+bar, then try again." Logging in through the existing token dialog fixes
+this immediately, no reload needed.

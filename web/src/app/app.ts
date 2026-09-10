@@ -27,7 +27,7 @@ import {
   selectTotalCount,
   selectUnauthorized,
 } from './contacts.selectors';
-import { Contact, ContactsService, NewContact } from './contacts.service';
+import { Contact, ContactsService, FailedImportRow, NewContact } from './contacts.service';
 
 const BOOT_SPLASH_MIN_MS = 1500;
 
@@ -234,6 +234,65 @@ export class DeleteConfirmDialog {
 }
 
 @Component({
+  selector: 'app-import-failures-dialog',
+  imports: [DatePipe, MatButtonModule, MatDialogModule],
+  template: `
+    <h2 mat-dialog-title>Failed import rows</h2>
+    <mat-dialog-content class="import-failures-content">
+      @if (loading()) {
+        <p class="table-status">Loading...</p>
+      } @else if (error()) {
+        <p class="form-error">{{ error() }}</p>
+      } @else if (rows().length === 0) {
+        <p class="table-status">No failed rows recorded.</p>
+      } @else {
+        @if (totalCount() > rows().length) {
+          <p class="table-status">
+            Showing the {{ rows().length }} most recently seen of {{ totalCount() }} distinct failing rows.
+          </p>
+        }
+        <ul class="import-failures-list">
+          @for (row of rows(); track row.rowHash) {
+            <li class="import-failures-item">
+              <p class="import-failures-error">{{ row.errorMessage }}</p>
+              <p class="import-failures-raw">{{ row.rawRow }}</p>
+              <p class="import-failures-meta">
+                Seen {{ row.attempts }}x, last on {{ row.lastSeenAtUtc | date: 'short' }}
+              </p>
+            </li>
+          }
+        </ul>
+      }
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" mat-dialog-close>Close</button>
+    </mat-dialog-actions>
+  `,
+})
+export class ImportFailuresDialog {
+  private readonly contactsService = inject(ContactsService);
+
+  protected readonly loading = signal(true);
+  protected readonly error = signal<string | null>(null);
+  protected readonly rows = signal<FailedImportRow[]>([]);
+  protected readonly totalCount = signal(0);
+
+  constructor() {
+    this.contactsService.getImportFailures().subscribe({
+      next: (result) => {
+        this.loading.set(false);
+        this.rows.set(result.items);
+        this.totalCount.set(result.totalCount);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.error.set('Could not load failed import rows.');
+      },
+    });
+  }
+}
+
+@Component({
   selector: 'app-auth-dialog',
   imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, ReactiveFormsModule],
   template: `
@@ -303,6 +362,7 @@ export class App {
 
   protected readonly importing = signal(false);
   protected readonly importError = signal<string | null>(null);
+  protected readonly importFailedCount = signal(0);
 
   protected readonly authToken = this.authService.token;
   protected readonly unauthorized = this.store.selectSignal(selectUnauthorized);
@@ -331,14 +391,6 @@ export class App {
     this.store.dispatch(ContactsActions.loadContacts());
   }
 
-  private requireAuth(): boolean {
-    if (this.authToken()) {
-      return true;
-    }
-    this.notify('Log in to make changes. Use the login icon in the top bar.', 'warn');
-    return false;
-  }
-
   protected openAuthDialog(): void {
     this.dialog.open(AuthDialog, { width: '420px', maxWidth: 'calc(100vw - 32px)' })
       .afterClosed()
@@ -356,10 +408,11 @@ export class App {
   }
 
   protected triggerImport(input: HTMLInputElement): void {
-    if (!this.requireAuth()) {
-      return;
-    }
     input.click();
+  }
+
+  protected openImportFailuresDialog(): void {
+    this.dialog.open(ImportFailuresDialog, { width: '720px', maxWidth: 'calc(100vw - 32px)' });
   }
 
   protected onPage(event: PageEvent): void {
@@ -372,35 +425,37 @@ export class App {
     if (!file) {
       return;
     }
-    if (!this.requireAuth()) {
-      return;
-    }
 
     this.importing.set(true);
     this.importError.set(null);
+    this.importFailedCount.set(0);
     this.contactsService.import(file).subscribe({
       next: (result) => {
         this.importing.set(false);
+        if (result.importedCount > 0) {
+          this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
+        }
         if (result.errors.length > 0) {
+          this.importFailedCount.set(result.errors.length);
           this.importError.set(
-            `Import failed: ${result.errors.map((rowError) => `row ${rowError.row}: ${rowError.message}`).join('; ')}`,
+            `Imported ${result.importedCount} contact(s). ${result.errors.length} row(s) failed to import.`,
           );
           return;
         }
         this.notify(`Imported ${result.importedCount} contact(s).`, 'add');
-        this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
       },
       error: (error) => {
         this.importing.set(false);
-        this.importError.set(error?.error?.error ?? 'Could not import the file. Check that the API is running, then try again.');
+        this.importError.set(
+          isUnauthorized(error)
+            ? 'Not authenticated. Use the login icon in the top bar, then try again.'
+            : (error?.error?.error ?? 'Could not import the file. Check that the API is running, then try again.'),
+        );
       },
     });
   }
 
   protected openCreateDialog(): void {
-    if (!this.requireAuth()) {
-      return;
-    }
     this.dialog.open(ContactDialog, { width: '640px', maxWidth: 'calc(100vw - 32px)', data: {} })
       .afterClosed()
       .subscribe((contact) => {
@@ -412,9 +467,6 @@ export class App {
   }
 
   protected openEditDialog(contact: Contact): void {
-    if (!this.requireAuth()) {
-      return;
-    }
     this.dialog.open(ContactDialog, { width: '640px', maxWidth: 'calc(100vw - 32px)', data: { contact } })
       .afterClosed()
       .subscribe((updated) => {
@@ -426,9 +478,6 @@ export class App {
   }
 
   protected openDeleteDialog(contact: Contact): void {
-    if (!this.requireAuth()) {
-      return;
-    }
     this.dialog.open(DeleteConfirmDialog, { width: '420px', maxWidth: 'calc(100vw - 32px)', data: { contact } })
       .afterClosed()
       .subscribe((deleted) => {
