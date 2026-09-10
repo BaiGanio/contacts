@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve --port 5186 --open",
     "build": "ng build",
+    "build:pages": "ng build --base-href /contacts/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
