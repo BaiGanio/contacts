@@ -6,12 +6,14 @@
 - EF Core command-line tools 10.0.8
 - Node.js 26
 - npm 11
+- Docker (to run PostgreSQL locally)
 
 Check the installed tools:
 
 ```sh
 dotnet --version
 dotnet ef --version
+docker --version
 ```
 
 If `dotnet ef` is not installed:
@@ -32,21 +34,26 @@ dotnet test Contacts.slnx
 
 ## Create or update the development database
 
-The development configuration uses SQLite. Apply all checked-in migrations:
+The development configuration uses PostgreSQL. Start it with Docker Compose,
+then apply all checked-in migrations:
 
 ```sh
+docker compose up -d
 dotnet ef database update --project src/Contacts.Api
 ```
 
-This creates `src/Contacts.Api/contacts.db`. The database file and its SQLite
-sidecar files are local development output and are intentionally ignored by
-Git. The migrations and SQLite configuration remain checked in, so every
-developer can create the same database locally. The migrations themselves
-create only an empty table. The first time the API starts against an empty
-database, it seeds the 300 contacts from
+This starts a local PostgreSQL container (database, user, and password all
+`lk_contacts`) with its data kept in a named Docker volume, so it survives
+container restarts. The migrations and PostgreSQL configuration remain
+checked in, so every developer can create the same database locally. The
+migrations themselves create only an empty table. The first time the API
+starts against an empty database, it seeds the 300 contacts from
 `seed-data/contacts-02-poc-300.csv`, validating each row through the same
 domain rules as a normal create (invalid rows are skipped and logged, not
 inserted).
+
+Stop the database with `docker compose down` (add `-v` to also delete its
+data volume).
 
 When the EF model intentionally changes, create a migration from the repository
 root and then apply it:
