@@ -74,7 +74,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: contacts-api
-          image: ghcr.io/baiganio/contacts-api:1 # {"$imagepolicy": "contacts:contacts-api"}
+          image: ghcr.io/baiganio/contacts-api:2@sha256:f55c2aa074bb74d66ed90519b7418d1369167bdc7929bb1ae8ce32fe744f376b # {"$imagepolicy": "contacts:contacts-api"}
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
