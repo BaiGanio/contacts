@@ -62,7 +62,9 @@ public static class ContactEndpoints
             IValidator<UpdateContactRequest> validator,
             CancellationToken cancellationToken) =>
         {
-            var validation = await validator.ValidateAsync(request, cancellationToken);
+            var validationContext = new ValidationContext<UpdateContactRequest>(request);
+            validationContext.RootContextData[UpdateContactRequestValidator.ContactIdContextKey] = id;
+            var validation = await validator.ValidateAsync(validationContext, cancellationToken);
             if (!validation.IsValid)
             {
                 return validation.ToValidationProblem();

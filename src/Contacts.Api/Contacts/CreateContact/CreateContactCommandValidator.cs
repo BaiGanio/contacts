@@ -1,11 +1,13 @@
+using Contacts.Api.Data;
 using Contacts.Domain;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace Contacts.Api.Contacts.CreateContact;
 
 public sealed class CreateContactCommandValidator : AbstractValidator<CreateContactCommand>
 {
-    public CreateContactCommandValidator()
+    public CreateContactCommandValidator(ContactsDbContext dbContext)
     {
         RuleFor(command => command.FirstName).NotEmpty();
         RuleFor(command => command.Surname).NotEmpty();
@@ -31,6 +33,26 @@ public sealed class CreateContactCommandValidator : AbstractValidator<CreateCont
                 {
                     context.AddFailure(ex.Message);
                 }
-            });
+            })
+            .MustAsync(async (value, cancellationToken) =>
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return true;
+                }
+
+                Iban iban;
+                try
+                {
+                    iban = new Iban(value);
+                }
+                catch (ArgumentException)
+                {
+                    return true;
+                }
+
+                return !await dbContext.Contacts.AnyAsync(contact => contact.Iban == iban, cancellationToken);
+            })
+            .WithMessage("A contact with this IBAN already exists.");
     }
 }

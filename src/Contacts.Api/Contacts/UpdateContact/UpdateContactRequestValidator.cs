@@ -1,11 +1,15 @@
+using Contacts.Api.Data;
 using Contacts.Domain;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace Contacts.Api.Contacts.UpdateContact;
 
 public sealed class UpdateContactRequestValidator : AbstractValidator<UpdateContactRequest>
 {
-    public UpdateContactRequestValidator()
+    public const string ContactIdContextKey = "ContactId";
+
+    public UpdateContactRequestValidator(ContactsDbContext dbContext)
     {
         RuleFor(request => request.FirstName).NotEmpty();
         RuleFor(request => request.Surname).NotEmpty();
@@ -31,6 +35,32 @@ public sealed class UpdateContactRequestValidator : AbstractValidator<UpdateCont
                 {
                     context.AddFailure(ex.Message);
                 }
-            });
+            })
+            .MustAsync(async (_, value, context, cancellationToken) =>
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return true;
+                }
+
+                Iban iban;
+                try
+                {
+                    iban = new Iban(value);
+                }
+                catch (ArgumentException)
+                {
+                    return true;
+                }
+
+                var currentContactId = context.RootContextData.TryGetValue(ContactIdContextKey, out var idValue) && idValue is Guid id
+                    ? id
+                    : Guid.Empty;
+
+                return !await dbContext.Contacts.AnyAsync(
+                    contact => contact.Iban == iban && contact.Id != currentContactId,
+                    cancellationToken);
+            })
+            .WithMessage("A contact with this IBAN already exists.");
     }
 }
