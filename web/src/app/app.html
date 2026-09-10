@@ -10,7 +10,11 @@
     aria-label="Import a CSV file"
     matTooltip="Import CSV"
   >
-    <mat-icon>{{ importing() ? 'hourglass_top' : 'upload_file' }}</mat-icon>
+    @if (importing()) {
+      <mat-spinner diameter="20"></mat-spinner>
+    } @else {
+      <mat-icon>upload_file</mat-icon>
+    }
   </button>
   <button
     mat-icon-button
@@ -43,6 +47,13 @@
 <main class="content">
   @if (unauthorized()) {
     <p class="status status-error">Not authenticated. Use the login icon in the top bar, then try again.</p>
+  }
+
+  @if (importing()) {
+    <p class="status status-importing">
+      <mat-spinner diameter="18"></mat-spinner>
+      Importing contacts... {{ importElapsedLabel() }} elapsed. This can take a while for large files.
+    </p>
   }
 
   @if (importError()) {

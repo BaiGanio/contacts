@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -334,6 +335,7 @@ export class AuthDialog {
     MatIconModule,
     MatInputModule,
     MatPaginatorModule,
+    MatProgressSpinnerModule,
     MatTableModule,
     MatToolbarModule,
     MatTooltipModule,
@@ -363,6 +365,8 @@ export class App {
   protected readonly importing = signal(false);
   protected readonly importError = signal<string | null>(null);
   protected readonly importFailedCount = signal(0);
+  protected readonly importElapsedLabel = signal('0s');
+  private importTimer: ReturnType<typeof setInterval> | null = null;
 
   protected readonly authToken = this.authService.token;
   protected readonly unauthorized = this.store.selectSignal(selectUnauthorized);
@@ -419,6 +423,24 @@ export class App {
     this.store.dispatch(ContactsActions.setPage({ pageIndex: event.pageIndex, pageSize: event.pageSize }));
   }
 
+  private startImportTimer(): void {
+    const startedAt = Date.now();
+    this.importElapsedLabel.set('0s');
+    this.importTimer = setInterval(() => {
+      const totalSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      this.importElapsedLabel.set(minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`);
+    }, 1000);
+  }
+
+  private stopImportTimer(): void {
+    if (this.importTimer !== null) {
+      clearInterval(this.importTimer);
+      this.importTimer = null;
+    }
+  }
+
   protected importFile(input: HTMLInputElement): void {
     const file = input.files?.[0];
     input.value = '';
@@ -429,9 +451,11 @@ export class App {
     this.importing.set(true);
     this.importError.set(null);
     this.importFailedCount.set(0);
+    this.startImportTimer();
     this.contactsService.import(file).subscribe({
       next: (result) => {
         this.importing.set(false);
+        this.stopImportTimer();
         if (result.importedCount > 0) {
           this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
         }
@@ -446,6 +470,7 @@ export class App {
       },
       error: (error) => {
         this.importing.set(false);
+        this.stopImportTimer();
         this.importError.set(
           isUnauthorized(error)
             ? 'Not authenticated. Use the login icon in the top bar, then try again.'

@@ -200,6 +200,7 @@ mat-toolbar.app-toolbar {
 
 .status { color: var(--ledger-ink-muted); margin: 0 0 8px; padding: 4px 0; }
 .status-error { color: var(--ledger-error); }
+.status-importing { display: flex; align-items: center; gap: 8px; }
 
 .table-panel {
   background: var(--ledger-surface);
