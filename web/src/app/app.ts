@@ -13,8 +13,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { Actions, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
-import { debounceTime } from 'rxjs';
+import { debounceTime, filter, take } from 'rxjs';
 import { AuthService } from './auth.service';
 import { ContactsActions } from './contacts.actions';
 import {
@@ -113,7 +114,8 @@ export interface ContactDialogData {
 export class ContactDialog {
   private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<ContactDialog, Contact>);
-  private readonly contactsService = inject(ContactsService);
+  private readonly store = inject(Store);
+  private readonly actions$ = inject(Actions);
   protected readonly data = inject<ContactDialogData>(MAT_DIALOG_DATA);
 
   protected readonly submitting = signal(false);
@@ -146,22 +148,33 @@ export class ContactDialog {
 
     this.submitting.set(true);
     this.submitError.set(null);
-    const request = this.data.contact
-      ? this.contactsService.update(this.data.contact.id, edits)
-      : this.contactsService.create(edits as NewContact);
 
-    request.subscribe({
-      next: (contact) => {
+    this.actions$
+      .pipe(
+        ofType(
+          ContactsActions.createContactSuccess,
+          ContactsActions.createContactFailure,
+          ContactsActions.updateContactSuccess,
+          ContactsActions.updateContactFailure,
+        ),
+        take(1),
+      )
+      .subscribe((action) => {
         this.submitting.set(false);
-        this.dialogRef.close(contact);
-      },
-      error: (error) => {
-        this.submitting.set(false);
-        if (!this.applyServerFieldErrors(error)) {
-          this.submitError.set(readableSubmitError(error));
+        if ('error' in action) {
+          if (!this.applyServerFieldErrors(action.error)) {
+            this.submitError.set(readableSubmitError(action.error));
+          }
+          return;
         }
-      },
-    });
+        this.dialogRef.close(action.contact);
+      });
+
+    if (this.data.contact) {
+      this.store.dispatch(ContactsActions.updateContact({ id: this.data.contact.id, edits }));
+    } else {
+      this.store.dispatch(ContactsActions.createContact({ contact: edits as NewContact }));
+    }
   }
 
   private applyServerFieldErrors(error: unknown): boolean {
@@ -208,7 +221,8 @@ export interface DeleteConfirmDialogData {
 })
 export class DeleteConfirmDialog {
   private readonly dialogRef = inject(MatDialogRef<DeleteConfirmDialog, boolean>);
-  private readonly contactsService = inject(ContactsService);
+  private readonly store = inject(Store);
+  private readonly actions$ = inject(Actions);
   protected readonly data = inject<DeleteConfirmDialogData>(MAT_DIALOG_DATA);
 
   protected readonly deleting = signal(false);
@@ -217,20 +231,27 @@ export class DeleteConfirmDialog {
   protected confirmDelete(): void {
     this.deleting.set(true);
     this.error.set(null);
-    this.contactsService.delete(this.data.contact.id).subscribe({
-      next: () => {
+
+    this.actions$
+      .pipe(
+        ofType(ContactsActions.deleteContactSuccess, ContactsActions.deleteContactFailure),
+        filter((action) => action.id === this.data.contact.id),
+        take(1),
+      )
+      .subscribe((action) => {
         this.deleting.set(false);
+        if ('error' in action) {
+          this.error.set(
+            isUnauthorized(action.error)
+              ? 'Not authenticated. Use the login icon in the top bar, then try again.'
+              : 'Could not delete this contact. Try again.',
+          );
+          return;
+        }
         this.dialogRef.close(true);
-      },
-      error: (error) => {
-        this.deleting.set(false);
-        this.error.set(
-          isUnauthorized(error)
-            ? 'Not authenticated. Use the login icon in the top bar, then try again.'
-            : 'Could not delete this contact. Try again.',
-        );
-      },
-    });
+      });
+
+    this.store.dispatch(ContactsActions.deleteContact({ id: this.data.contact.id }));
   }
 }
 
@@ -486,7 +507,6 @@ export class App {
       .subscribe((contact) => {
         if (contact) {
           this.notify(`Added ${contact.firstName} ${contact.surname}.`, 'add');
-          this.loadContacts();
         }
       });
   }
@@ -497,7 +517,6 @@ export class App {
       .subscribe((updated) => {
         if (updated) {
           this.notify(`Saved changes for ${updated.firstName} ${updated.surname}.`, 'update');
-          this.loadContacts();
         }
       });
   }
@@ -508,7 +527,6 @@ export class App {
       .subscribe((deleted) => {
         if (deleted) {
           this.notify(`Deleted ${contact.firstName} ${contact.surname}.`, 'delete');
-          this.loadContacts();
         }
       });
   }

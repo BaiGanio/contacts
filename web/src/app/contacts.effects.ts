@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
-import { catchError, map, of, switchMap, withLatestFrom } from 'rxjs';
+import { catchError, map, mergeMap, of, switchMap, withLatestFrom } from 'rxjs';
 import { ContactsActions } from './contacts.actions';
 import { selectListQuery } from './contacts.selectors';
 import { ContactsService } from './contacts.service';
@@ -35,6 +35,53 @@ export class ContactsEffects {
           ),
         ),
       ),
+    ),
+  );
+
+  createContact$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(ContactsActions.createContact),
+      mergeMap(({ contact }) =>
+        this.contactsService.create(contact).pipe(
+          map((created) => ContactsActions.createContactSuccess({ contact: created })),
+          catchError((error) => of(ContactsActions.createContactFailure({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  updateContact$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(ContactsActions.updateContact),
+      mergeMap(({ id, edits }) =>
+        this.contactsService.update(id, edits).pipe(
+          map((updated) => ContactsActions.updateContactSuccess({ contact: updated })),
+          catchError((error) => of(ContactsActions.updateContactFailure({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  deleteContact$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(ContactsActions.deleteContact),
+      mergeMap(({ id }) =>
+        this.contactsService.delete(id).pipe(
+          map(() => ContactsActions.deleteContactSuccess({ id })),
+          catchError((error) => of(ContactsActions.deleteContactFailure({ id, error }))),
+        ),
+      ),
+    ),
+  );
+
+  reloadAfterMutation$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(
+        ContactsActions.createContactSuccess,
+        ContactsActions.updateContactSuccess,
+        ContactsActions.deleteContactSuccess,
+      ),
+      map(() => ContactsActions.loadContacts()),
     ),
   );
 }
