@@ -1,5 +1,5 @@
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
-import { Contact, ContactEdits, NewContact } from './contacts.service';
+import { Contact, ContactEdits, NewContact } from '../contacts.models';
 
 export const ContactsActions = createActionGroup({
   source: 'Contacts',

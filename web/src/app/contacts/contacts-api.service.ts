@@ -1,45 +1,16 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { AuthService } from './auth.service';
-
-export interface Contact {
-  id: string;
-  firstName: string;
-  surname: string;
-  dateOfBirth: string;
-  address: string;
-  phoneNumber: string;
-  iban: string;
-}
-
-export type NewContact = Omit<Contact, 'id'>;
-export type ContactEdits = Omit<Contact, 'id'>;
-
-export interface ImportRowError {
-  row: number;
-  message: string;
-}
-
-export interface ImportResult {
-  importedCount: number;
-  errors: ImportRowError[];
-}
-
-export interface FailedImportRow {
-  rowHash: string;
-  rowNumber: number;
-  rawRow: string;
-  errorMessage: string;
-  firstSeenAtUtc: string;
-  lastSeenAtUtc: string;
-  attempts: number;
-}
-
-export interface FailedImportRows {
-  items: FailedImportRow[];
-  totalCount: number;
-}
+import { AuthService } from '../auth/auth.service';
+import {
+  Contact,
+  ContactEdits,
+  ContactsPage,
+  ContactsQuery,
+  FailedImportRows,
+  ImportResult,
+  NewContact,
+} from './contacts.models';
 
 interface ApiContact {
   id: string;
@@ -54,17 +25,6 @@ interface ApiContact {
 interface ApiPagedContacts {
   items: ApiContact[];
   totalCount: number;
-}
-
-export interface ContactsPage {
-  contacts: Contact[];
-  totalCount: number;
-}
-
-export interface ContactsQuery {
-  page: number;
-  pageSize: number;
-  search: string;
 }
 
 function toContact(apiContact: ApiContact): Contact {
@@ -85,7 +45,7 @@ function toContact(apiContact: ApiContact): Contact {
  * representation) so the rest of the app can use one flat Contact model.
  */
 @Injectable({ providedIn: 'root' })
-export class ContactsService {
+export class ContactsApiService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly baseUrl = 'http://localhost:5187/api/contacts';

@@ -1,0 +1,17 @@
+<input #csvInput type="file" accept=".csv" hidden (change)="handleFileChange(csvInput)" />
+
+@if (importing()) {
+  <p class="status status-importing">
+    <mat-spinner diameter="18"></mat-spinner>
+    Importing contacts... {{ importElapsedLabel() }} elapsed. This can take a while for large files.
+  </p>
+}
+
+@if (importError()) {
+  <p class="status status-error">
+    {{ importError() }}
+    @if (importFailedCount() > 0) {
+      <button mat-button type="button" (click)="openImportFailuresDialog()">View failed rows</button>
+    }
+  </p>
+}

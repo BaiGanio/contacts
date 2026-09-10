@@ -1,0 +1,45 @@
+<h2 mat-dialog-title>{{ data.contact ? 'Edit contact' : 'Add a new contact' }}</h2>
+<mat-dialog-content>
+  <p>Enter the details below. Every field is required.</p>
+  @if (submitError()) {
+    <p class="form-error">{{ submitError() }}</p>
+  }
+  <form id="contact-form" class="contact-form" [formGroup]="form" (ngSubmit)="save()">
+    <mat-form-field appearance="outline">
+      <mat-label>First name</mat-label>
+      <input matInput formControlName="firstName" />
+      <mat-error>{{ form.get('firstName')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Surname</mat-label>
+      <input matInput formControlName="surname" />
+      <mat-error>{{ form.get('surname')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Date of birth</mat-label>
+      <input matInput type="date" formControlName="dateOfBirth" />
+      <mat-error>{{ form.get('dateOfBirth')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Address</mat-label>
+      <input matInput formControlName="address" />
+      <mat-error>{{ form.get('address')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Phone number</mat-label>
+      <input matInput formControlName="phoneNumber" />
+      <mat-error>{{ form.get('phoneNumber')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>IBAN</mat-label>
+      <input matInput formControlName="iban" />
+      <mat-error>{{ form.get('iban')?.getError('server') ?? 'Required' }}</mat-error>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close [disabled]="submitting()">Cancel</button>
+  <button mat-flat-button type="submit" form="contact-form" [disabled]="submitting()">
+    {{ submitting() ? 'Saving...' : data.contact ? 'Save changes' : 'Add contact' }}
+  </button>
+</mat-dialog-actions>

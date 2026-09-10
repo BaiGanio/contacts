@@ -1,4 +1,4 @@
-import { Contact } from './contacts.service';
+import { Contact } from '../contacts.models';
 
 export const DEFAULT_PAGE_SIZE = 20;
 

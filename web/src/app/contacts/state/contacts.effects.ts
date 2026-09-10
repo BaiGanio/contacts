@@ -2,21 +2,18 @@ import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { catchError, filter, map, mergeMap, of, switchMap, withLatestFrom } from 'rxjs';
+import { isUnauthorized } from '../http-errors';
+import { ContactsApiService } from '../contacts-api.service';
 import { ContactsActions } from './contacts.actions';
 import { selectListQuery, selectPageIndex, selectPageSize } from './contacts.selectors';
-import { ContactsService } from './contacts.service';
 
 const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
-
-function isUnauthorized(error: unknown): boolean {
-  return (error as { status?: number })?.status === 401;
-}
 
 @Injectable()
 export class ContactsEffects {
   private readonly actions$ = inject(Actions);
   private readonly store = inject(Store);
-  private readonly contactsService = inject(ContactsService);
+  private readonly contactsService = inject(ContactsApiService);
 
   loadContacts$ = createEffect(() =>
     this.actions$.pipe(

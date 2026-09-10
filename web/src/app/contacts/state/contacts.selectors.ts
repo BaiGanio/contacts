@@ -1,7 +1,7 @@
 import { createFeatureSelector, createSelector } from '@ngrx/store';
 import { contactsFeatureKey } from './contacts.reducer';
 import { ContactsState } from './contacts.state';
-import { ContactsQuery } from './contacts.service';
+import { ContactsQuery } from '../contacts.models';
 
 export const selectContactsState = createFeatureSelector<ContactsState>(contactsFeatureKey);
 
