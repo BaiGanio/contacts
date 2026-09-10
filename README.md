@@ -88,6 +88,19 @@ time it starts against an empty `Contacts` table, restarting the API right
 after this command re-adds those 300 rows — stop the API first, or import a
 different fixture instead, if you want the table to stay empty.
 
+Where there is no shell access to the database directly (for example, the
+deployed Pi5 API), `DELETE /api/contacts` does the same `TRUNCATE`, over
+HTTP, through Swagger or curl. It also requires a bearer token if
+`Auth:Enabled` is `true`:
+
+```sh
+curl -i -X DELETE http://localhost:5187/api/contacts
+```
+
+This empties both `Contacts` and `FailedImportRows` in one call — useful
+between repeated imports of the 1,000,000-row fixture below. There is no
+confirmation step and no undo.
+
 When the EF model intentionally changes, create a migration from the repository
 root and then apply it:
 
@@ -145,6 +158,19 @@ The HTTP development profile listens on port 5187. Open the Swagger UI at:
 ```text
 http://localhost:5187/swagger
 ```
+
+Swagger UI is also available on the deployed API, not just locally:
+
+```text
+https://contacts-api.baiganio.io/swagger/index.html
+```
+
+The bare root URL (`https://contacts-api.baiganio.io/`) redirects to that
+same page. If `Auth:Enabled` is `true` (as it is in production), get a
+token from `POST /api/auth/token` in Swagger, click the **Authorize**
+button at the top of the page, and paste the token in — see
+[Dummy token auth proof of concept](#dummy-token-auth-proof-of-concept)
+below. Without this, every other endpoint in Swagger returns `401`.
 
 ## Run the web application
 
@@ -380,6 +406,11 @@ the **Log in** dialog at the top of the Angular page; the dialog calls
 `localStorage`, sending it as an `Authorization: Bearer` header on every
 API call. If the flag is on and no token is stored yet, the page shows a
 "Not authenticated" message.
+
+In Swagger UI, get a token from `POST /api/auth/token` the same way, then
+click the green **Authorize** button near the top of the page and paste
+the token in (no `Bearer` prefix needed). Every other endpoint in Swagger
+then sends it automatically.
 
 ### Frontend write gating
 

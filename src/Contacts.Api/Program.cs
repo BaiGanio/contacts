@@ -16,6 +16,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,7 +42,22 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 
 builder.Services.AddDbContext<ContactsDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste the token from POST /api/auth/token (no \"Bearer \" prefix needed).",
+    });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        { new OpenApiSecuritySchemeReference("Bearer", document), [] },
+    });
+});
 
 builder.Services.AddScoped<IValidator<CreateContactCommand>, CreateContactCommandValidator>();
 builder.Services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
@@ -272,10 +288,20 @@ var getImportFailures = app.MapGet("/api/imports/failures", async (ContactsDbCon
     return Results.Ok(new FailedImportRowsResponse(failures, totalCount));
 });
 
+var clearContacts = app.MapDelete("/api/contacts", async (ContactsDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    // TRUNCATE, not DELETE FROM, so clearing a multi-million-row test import stays
+    // instant instead of scanning and logging every row.
+    await dbContext.Database.ExecuteSqlRawAsync(
+        """TRUNCATE TABLE "Contacts", "FailedImportRows" RESTART IDENTITY""", cancellationToken);
+    return Results.NoContent();
+});
+
 if (authEnabled)
 {
     importContacts.RequireAuthorization();
     getImportFailures.RequireAuthorization();
+    clearContacts.RequireAuthorization();
 }
 
 using (var seedScope = app.Services.CreateScope())
