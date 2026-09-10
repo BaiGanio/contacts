@@ -110,7 +110,7 @@ if (authEnabled)
     });
 }
 
-app.MapGet("/", () => "Hello World!");
+app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
 
 app.MapContactEndpoints(authEnabled);
 
