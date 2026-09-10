@@ -27,14 +27,14 @@ public sealed class GetContactsHandler(ContactsDbContext dbContext)
             .ThenBy(contact => contact.FirstName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(contact => new ContactListItemDto(
+            .Select(contact => new ContactResponse(
                 contact.Id,
                 contact.FirstName,
                 contact.Surname,
                 contact.DateOfBirth,
                 contact.Address,
                 contact.PhoneNumber,
-                contact.Iban))
+                contact.Iban.Value))
             .ToListAsync(cancellationToken);
 
         return new PagedContactsResult(items, totalCount);

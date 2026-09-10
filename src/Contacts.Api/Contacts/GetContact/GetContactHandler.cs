@@ -17,7 +17,7 @@ public sealed class GetContactHandler(ContactsDbContext dbContext)
                 contact.DateOfBirth,
                 contact.Address,
                 contact.PhoneNumber,
-                contact.Iban))
+                contact.Iban.Value))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

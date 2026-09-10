@@ -9,7 +9,7 @@ public sealed record ContactResponse(
     DateOnly DateOfBirth,
     string Address,
     string PhoneNumber,
-    Iban Iban)
+    string Iban)
 {
     public static ContactResponse FromContact(Contact contact) => new(
         contact.Id,
@@ -18,5 +18,5 @@ public sealed record ContactResponse(
         contact.DateOfBirth,
         contact.Address,
         contact.PhoneNumber,
-        contact.Iban);
+        contact.Iban.Value);
 }
