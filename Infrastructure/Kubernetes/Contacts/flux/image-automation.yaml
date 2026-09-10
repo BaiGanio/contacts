@@ -21,7 +21,10 @@ spec:
     name: contacts-api
   # Tags are plain build numbers (github.run_number), not vX.Y.Z — every push to master
   # that touches the API builds and pushes automatically, no manual git tag needed.
-  # numerical/asc just means "pick the highest number".
+  # numerical/asc just means "pick the highest number". filterTags excludes the leftover
+  # "0.1.0" tag from the old version-tag design, which numerical can't parse at all.
+  filterTags:
+    pattern: '^[0-9]+$'
   policy:
     numerical:
       order: asc
