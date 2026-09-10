@@ -91,6 +91,30 @@ overlapping 3-character chunks of every name so a "contains" search can use
 an index. Measured against the 1,000,000-row fixture below: the trigram
 indexes cut a search from ~240ms (sequential scan) to under 1ms.
 
+### List page ordering index
+
+`GET /api/contacts` orders results by `Surname`, then `FirstName`. Without
+an index on those columns, Postgres has to sort the entire table on every
+request, spilling to disk once the table is large — a plain btree index on
+`(Surname, FirstName, Id)` lets it read rows already in that order instead.
+
+Measured against the 1,000,000-row fixture:
+
+| Request | Before this index | After |
+| -------- | ------------------- | ------ |
+| First page | ~63ms (full sort) | ~0.2ms |
+| A deep, unfiltered page (row 500,000) | ~893ms (sorts to disk) | ~478ms |
+
+This index makes the first page and normal browsing fast, and it is why a
+search stays fast too — a search narrows the table down first, so it is
+almost never paging deep into the full table. It does **not** fully fix a
+deep page over the *entire, unfiltered* table (`OFFSET` still has to walk
+past every skipped row one at a time) — that would need keyset
+("load more after the last row I saw") pagination instead of page numbers,
+which was deferred because it would also change the API shape and remove
+the paginator's jump-to-page-number control. Revisit if the table grows
+much larger and deep unfiltered browsing turns out to matter in practice.
+
 ## Run the API
 
 Apply the migrations first, then start the development profile:

@@ -53,6 +53,12 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             contact.HasIndex(value => value.Iban).IsUnique();
             contact.HasIndex(value => value.FirstName).HasMethod("gin").HasOperators("gin_trgm_ops");
             contact.HasIndex(value => value.Surname).HasMethod("gin").HasOperators("gin_trgm_ops");
+
+            // Matches GetContactsHandler's OrderBy(Surname).ThenBy(FirstName) so the list
+            // page can read rows already in order instead of sorting the whole table on
+            // every request. Id is included only as a tiebreaker for a stable order; it
+            // does not by itself speed up OFFSET on a deep, unfiltered page.
+            contact.HasIndex(value => new { value.Surname, value.FirstName, value.Id });
         });
 
         modelBuilder.Entity<FailedImportRow>(row =>
