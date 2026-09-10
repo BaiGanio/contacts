@@ -33,6 +33,10 @@ var signingCredentials = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signing
 
 ValidatorOptions.Global.LanguageManager.Enabled = false;
 
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 200 * 1024 * 1024);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+    options.MultipartBodyLengthLimit = 200 * 1024 * 1024);
+
 builder.Services.AddDbContext<ContactsDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -107,8 +111,9 @@ app.MapContactEndpoints(authEnabled);
 
 var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, ContactsDbContext dbContext, CancellationToken cancellationToken) =>
 {
-    const int MaxFileBytes = 1 * 1024 * 1024;
-    const int MaxDataRows = 1000;
+    const int MaxFileBytes = 200 * 1024 * 1024;
+    const int MaxDataRows = 2_000_000;
+    const int BatchSize = 5_000;
     string[] requiredColumns = ["FirstName", "Surname", "DateOfBirth", "Street", "City", "PostalCode", "Country", "Phone", "Iban"];
 
     if (file.Length == 0)
@@ -118,7 +123,7 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
 
     if (file.Length > MaxFileBytes)
     {
-        return Results.BadRequest(new { error = "The file exceeds the 1 MB import limit." });
+        return Results.BadRequest(new { error = $"The file exceeds the {MaxFileBytes / 1024 / 1024} MB import limit." });
     }
 
     using var reader = new StreamReader(file.OpenReadStream());
@@ -141,9 +146,10 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
         .Select(iban => iban.Value)
         .ToHashSet();
 
-    var contactsToSave = new List<Contact>();
+    var contactsToSave = new List<Contact>(BatchSize);
     var errors = new List<ImportRowError>();
     var failedRows = new List<(string Hash, int Row, string Raw, string Message)>();
+    var importedCount = 0;
     var row = 1;
 
     while (csv.Read())
@@ -180,6 +186,17 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
         if (contact is not null)
         {
             contactsToSave.Add(contact);
+
+            // Saved in bounded batches, not all at once, so a multi-million-row file
+            // does not hold every tracked entity in memory for one giant transaction.
+            if (contactsToSave.Count >= BatchSize)
+            {
+                dbContext.Contacts.AddRange(contactsToSave);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                dbContext.ChangeTracker.Clear();
+                importedCount += contactsToSave.Count;
+                contactsToSave.Clear();
+            }
         }
         else
         {
@@ -213,10 +230,17 @@ var importContacts = app.MapPost("/api/contacts/import", async (IFormFile file, 
         }
     }
 
-    dbContext.Contacts.AddRange(contactsToSave);
+    if (contactsToSave.Count > 0)
+    {
+        dbContext.Contacts.AddRange(contactsToSave);
+        importedCount += contactsToSave.Count;
+    }
+
+    // Always save, even when every row in this batch failed (e.g. a full re-import of
+    // duplicate IBANs): the FailedImportRows tracked above still need to be persisted.
     await dbContext.SaveChangesAsync(cancellationToken);
 
-    return Results.Ok(new ImportResult(contactsToSave.Count, errors));
+    return Results.Ok(new ImportResult(importedCount, errors));
 })
 .DisableAntiforgery();
 
