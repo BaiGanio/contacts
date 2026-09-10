@@ -14,6 +14,7 @@ public sealed class ImportContactsHandler(ContactsDbContext dbContext)
     private const int MaxFileBytes = 200 * 1024 * 1024;
     private const int MaxDataRows = 2_000_000;
     private const int BatchSize = 5_000;
+    private const int MaxErrorSample = 100;
 
     private static readonly string[] RequiredColumns =
         ["FirstName", "Surname", "DateOfBirth", "Street", "City", "PostalCode", "Country", "Phone", "Iban"];
@@ -30,19 +31,20 @@ public sealed class ImportContactsHandler(ContactsDbContext dbContext)
             return Results.BadRequest(new { error = $"The file exceeds the {MaxFileBytes / 1024 / 1024} MB import limit." });
         }
 
+        // A full pass over the file before any writes: checks the header, the row count limit,
+        // and that every row can actually be read. A file that fails here is rejected with no
+        // batch ever committed -- previously a row-count or CSV-syntax problem discovered deep
+        // into the file could be reported as a 400 after earlier batches had already saved.
+        var structureError = ValidateStructure(file);
+        if (structureError is not null)
+        {
+            return Results.BadRequest(new { error = structureError });
+        }
+
         using var reader = new StreamReader(file.OpenReadStream());
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-
-        if (!csv.Read() || !csv.ReadHeader())
-        {
-            return Results.BadRequest(new { error = "The file has no header row." });
-        }
-
-        var missingColumns = RequiredColumns.Where(column => !csv.HeaderRecord!.Contains(column)).ToList();
-        if (missingColumns.Count > 0)
-        {
-            return Results.BadRequest(new { error = $"The file is missing required columns: {string.Join(", ", missingColumns)}." });
-        }
+        csv.Read();
+        csv.ReadHeader();
 
         // Good rows are saved even when other rows in the same file fail; failing rows are
         // recorded in FailedImportRows instead of being dropped, so they can be reviewed later.
@@ -51,19 +53,15 @@ public sealed class ImportContactsHandler(ContactsDbContext dbContext)
             .ToHashSet();
 
         var contactsToSave = new List<Contact>(BatchSize);
-        var errors = new List<ImportRowError>();
-        var failedRows = new List<(string Hash, int Row, string Raw, string Message)>();
+        var failedRowsToSave = new List<(string Hash, int Row, string Raw, string Message)>(BatchSize);
+        var errorSample = new List<ImportRowError>();
         var importedCount = 0;
+        var totalErrorCount = 0;
         var row = 1;
 
         while (csv.Read())
         {
             row++;
-
-            if (row - 1 > MaxDataRows)
-            {
-                return Results.BadRequest(new { error = $"The file exceeds the {MaxDataRows}-row import limit." });
-            }
 
             var rawRow = string.Join("|", RequiredColumns.Select(column => csv.GetField(column) ?? ""));
 
@@ -91,59 +89,126 @@ public sealed class ImportContactsHandler(ContactsDbContext dbContext)
             {
                 contactsToSave.Add(contact);
 
-                // Saved in bounded batches, not all at once, so a multi-million-row file
-                // does not hold every tracked entity in memory for one giant transaction.
                 if (contactsToSave.Count >= BatchSize)
                 {
-                    dbContext.Contacts.AddRange(contactsToSave);
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                    dbContext.ChangeTracker.Clear();
+                    await SaveContactBatchAsync(contactsToSave, cancellationToken);
                     importedCount += contactsToSave.Count;
                     contactsToSave.Clear();
                 }
             }
             else
             {
-                errors.Add(new ImportRowError(row, errorMessage!));
-                var rowHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawRow)));
-                failedRows.Add((rowHash, row, rawRow, errorMessage!));
-            }
-        }
-
-        if (failedRows.Count > 0)
-        {
-            var hashes = failedRows.Select(failedRow => failedRow.Hash).Distinct().ToList();
-            var existingFailedRows = await dbContext.FailedImportRows
-                .Where(failedRow => hashes.Contains(failedRow.RowHash))
-                .ToDictionaryAsync(failedRow => failedRow.RowHash, cancellationToken);
-
-            // Grouped by content hash so importing the same bad row (e.g. the same file)
-            // many times updates one record instead of creating a new one each time.
-            foreach (var group in failedRows.GroupBy(failedRow => failedRow.Hash))
-            {
-                var latest = group.OrderBy(failedRow => failedRow.Row).Last();
-                if (existingFailedRows.TryGetValue(group.Key, out var existingFailedRow))
+                totalErrorCount++;
+                if (errorSample.Count < MaxErrorSample)
                 {
-                    existingFailedRow.RecordOccurrence(latest.Row, latest.Message, group.Count());
+                    errorSample.Add(new ImportRowError(row, errorMessage!));
                 }
-                else
+
+                var rowHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawRow)));
+                failedRowsToSave.Add((rowHash, row, rawRow, errorMessage!));
+
+                // Flushed in bounded batches too, same as contacts, so a file with a huge
+                // number of bad rows does not hold every failure in memory at once.
+                if (failedRowsToSave.Count >= BatchSize)
                 {
-                    dbContext.FailedImportRows.Add(
-                        FailedImportRow.Create(group.Key, latest.Row, latest.Raw, latest.Message, group.Count()));
+                    await RecordFailuresAsync(failedRowsToSave, cancellationToken);
+                    failedRowsToSave.Clear();
                 }
             }
         }
 
         if (contactsToSave.Count > 0)
         {
-            dbContext.Contacts.AddRange(contactsToSave);
+            await SaveContactBatchAsync(contactsToSave, cancellationToken);
             importedCount += contactsToSave.Count;
         }
 
-        // Always save, even when every row in this batch failed (e.g. a full re-import of
-        // duplicate IBANs): the FailedImportRows tracked above still need to be persisted.
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (failedRowsToSave.Count > 0)
+        {
+            await RecordFailuresAsync(failedRowsToSave, cancellationToken);
+        }
 
-        return Results.Ok(new ImportResult(importedCount, errors));
+        return Results.Ok(new ImportResult(importedCount, errorSample, totalErrorCount));
+    }
+
+    private static string? ValidateStructure(IFormFile file)
+    {
+        using var reader = new StreamReader(file.OpenReadStream());
+        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
+        if (!csv.Read() || !csv.ReadHeader())
+        {
+            return "The file has no header row.";
+        }
+
+        var missingColumns = RequiredColumns.Where(column => !csv.HeaderRecord!.Contains(column)).ToList();
+        if (missingColumns.Count > 0)
+        {
+            return $"The file is missing required columns: {string.Join(", ", missingColumns)}.";
+        }
+
+        var row = 1;
+        try
+        {
+            while (csv.Read())
+            {
+                row++;
+
+                if (row - 1 > MaxDataRows)
+                {
+                    return $"The file exceeds the {MaxDataRows}-row import limit.";
+                }
+
+                // Touch every required field so a structurally broken row (wrong column count,
+                // bad quoting) is caught here, before any batch has been written, rather than
+                // surfacing as an unhandled error mid-import.
+                foreach (var column in RequiredColumns)
+                {
+                    _ = csv.GetField(column);
+                }
+            }
+        }
+        catch (CsvHelperException ex)
+        {
+            return $"The file is malformed at row {row}: {ex.Message}";
+        }
+
+        return null;
+    }
+
+    private async Task SaveContactBatchAsync(List<Contact> contacts, CancellationToken cancellationToken)
+    {
+        dbContext.Contacts.AddRange(contacts);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.ChangeTracker.Clear();
+    }
+
+    private async Task RecordFailuresAsync(
+        List<(string Hash, int Row, string Raw, string Message)> failedRows,
+        CancellationToken cancellationToken)
+    {
+        // Grouped by content hash so importing the same bad row (e.g. the same file) many
+        // times updates one record instead of creating a new one each time.
+        var hashes = failedRows.Select(failedRow => failedRow.Hash).Distinct().ToList();
+        var existingFailedRows = await dbContext.FailedImportRows
+            .Where(failedRow => hashes.Contains(failedRow.RowHash))
+            .ToDictionaryAsync(failedRow => failedRow.RowHash, cancellationToken);
+
+        foreach (var group in failedRows.GroupBy(failedRow => failedRow.Hash))
+        {
+            var latest = group.OrderBy(failedRow => failedRow.Row).Last();
+            if (existingFailedRows.TryGetValue(group.Key, out var existingFailedRow))
+            {
+                existingFailedRow.RecordOccurrence(latest.Row, latest.Message, group.Count());
+            }
+            else
+            {
+                dbContext.FailedImportRows.Add(
+                    FailedImportRow.Create(group.Key, latest.Row, latest.Raw, latest.Message, group.Count()));
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.ChangeTracker.Clear();
     }
 }

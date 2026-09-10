@@ -13,7 +13,18 @@ public static class ContactCsvRow
             throw new FormatException($"'{dateOfBirthRaw}' is not a valid date of birth. Use yyyy-MM-dd.");
         }
 
-        var address = $"{getField("Street")}, {getField("PostalCode")} {getField("City")}, {getField("Country")}";
+        var street = getField("Street") ?? "";
+        var city = getField("City") ?? "";
+        var postalCode = getField("PostalCode") ?? "";
+        var country = getField("Country") ?? "";
+
+        if (string.IsNullOrWhiteSpace(street) || string.IsNullOrWhiteSpace(city)
+            || string.IsNullOrWhiteSpace(postalCode) || string.IsNullOrWhiteSpace(country))
+        {
+            throw new FormatException("Street, City, PostalCode, and Country are all required.");
+        }
+
+        var address = $"{street}, {postalCode} {city}, {country}";
 
         return new Contact(
             getField("FirstName") ?? "",
