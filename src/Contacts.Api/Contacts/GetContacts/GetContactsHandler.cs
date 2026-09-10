@@ -14,18 +14,31 @@ public sealed class GetContactsHandler(ContactsDbContext dbContext)
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var pattern = $"%{query.Search.Trim()}%";
+            // % and _ are ILike wildcards; escaped so a search for a name that happens to
+            // contain them is matched literally instead of as a pattern.
+            var escapedSearch = query.Search.Trim()
+                .Replace("\\", "\\\\")
+                .Replace("%", "\\%")
+                .Replace("_", "\\_");
+            var pattern = $"%{escapedSearch}%";
             contactsQuery = contactsQuery.Where(contact =>
-                EF.Functions.ILike(contact.FirstName, pattern) ||
-                EF.Functions.ILike(contact.Surname, pattern));
+                EF.Functions.ILike(contact.FirstName, pattern, "\\") ||
+                EF.Functions.ILike(contact.Surname, pattern, "\\"));
         }
 
         var totalCount = await contactsQuery.CountAsync(cancellationToken);
 
+        // Surname/FirstName alone are not unique, so a page boundary can otherwise land
+        // mid-tie; Id is the tiebreaker (the composite index already covers this order).
+        // The offset is computed in long arithmetic and clamped so a huge page number can't
+        // overflow int -- it just requests an offset past every row, which returns empty.
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+
         var items = await contactsQuery
             .OrderBy(contact => contact.Surname)
             .ThenBy(contact => contact.FirstName)
-            .Skip((page - 1) * pageSize)
+            .ThenBy(contact => contact.Id)
+            .Skip(skip)
             .Take(pageSize)
             .Select(contact => new ContactResponse(
                 contact.Id,
