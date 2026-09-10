@@ -1,17 +1,29 @@
 using Contacts.Api.Data;
 using Contacts.Domain;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Contacts.Api.Tests;
 
 public sealed class ContactsDbContextTests
 {
+    private const string AdminConnectionString =
+        "Host=localhost;Port=5432;Database=postgres;Username=lk_contacts;Password=lk_contacts";
+
     [Fact]
     public async Task SavesAndReloadsContactWithNormalizedIban()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"contacts-{Guid.NewGuid():N}.db");
+        var databaseName = $"contacts_test_{Guid.NewGuid():N}";
+
+        await using (var adminConnection = new NpgsqlConnection(AdminConnectionString))
+        {
+            await adminConnection.OpenAsync();
+            await using var createCommand = new NpgsqlCommand($"CREATE DATABASE \"{databaseName}\"", adminConnection);
+            await createCommand.ExecuteNonQueryAsync();
+        }
+
         var options = new DbContextOptionsBuilder<ContactsDbContext>()
-            .UseSqlite($"Data Source={databasePath}")
+            .UseNpgsql($"Host=localhost;Port=5432;Database={databaseName};Username=lk_contacts;Password=lk_contacts")
             .Options;
 
         try
@@ -43,7 +55,12 @@ public sealed class ContactsDbContextTests
         }
         finally
         {
-            File.Delete(databasePath);
+            NpgsqlConnection.ClearAllPools();
+            await using var adminConnection = new NpgsqlConnection(AdminConnectionString);
+            await adminConnection.OpenAsync();
+            await using var dropCommand = new NpgsqlCommand(
+                $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)", adminConnection);
+            await dropCommand.ExecuteNonQueryAsync();
         }
     }
 }
