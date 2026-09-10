@@ -59,12 +59,19 @@ public static class ContactEndpoints
             Guid id,
             UpdateContactRequest request,
             UpdateContactHandler handler,
-            IValidator<UpdateContactRequest> validator,
+            IValidator<UpdateContactCommand> validator,
             CancellationToken cancellationToken) =>
         {
-            var validationContext = new ValidationContext<UpdateContactRequest>(request);
-            validationContext.RootContextData[UpdateContactRequestValidator.ContactIdContextKey] = id;
-            var validation = await validator.ValidateAsync(validationContext, cancellationToken);
+            var command = new UpdateContactCommand(
+                id,
+                request.FirstName,
+                request.Surname,
+                request.DateOfBirth,
+                request.Address,
+                request.PhoneNumber,
+                request.Iban);
+
+            var validation = await validator.ValidateAsync(command, cancellationToken);
             if (!validation.IsValid)
             {
                 return validation.ToValidationProblem();
@@ -72,15 +79,6 @@ public static class ContactEndpoints
 
             try
             {
-                var command = new UpdateContactCommand(
-                    id,
-                    request.FirstName,
-                    request.Surname,
-                    request.DateOfBirth,
-                    request.Address,
-                    request.PhoneNumber,
-                    request.Iban);
-
                 var response = await handler.HandleAsync(command, cancellationToken);
                 return response is null ? Results.NotFound() : Results.Ok(response);
             }

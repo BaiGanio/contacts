@@ -15,7 +15,7 @@ public static class ContactServiceCollectionExtensions
     public static IServiceCollection AddContactServices(this IServiceCollection services)
     {
         services.AddScoped<IValidator<CreateContactCommand>, CreateContactCommandValidator>();
-        services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
+        services.AddScoped<IValidator<UpdateContactCommand>, UpdateContactCommandValidator>();
         services.AddScoped<CreateContactHandler>();
         services.AddScoped<GetContactsHandler>();
         services.AddScoped<GetContactHandler>();

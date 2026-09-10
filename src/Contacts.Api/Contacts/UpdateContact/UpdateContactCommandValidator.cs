@@ -1,11 +1,11 @@
 using Contacts.Api.Data;
 using FluentValidation;
 
-namespace Contacts.Api.Contacts.CreateContact;
+namespace Contacts.Api.Contacts.UpdateContact;
 
-public sealed class CreateContactCommandValidator : AbstractValidator<CreateContactCommand>
+public sealed class UpdateContactCommandValidator : AbstractValidator<UpdateContactCommand>
 {
-    public CreateContactCommandValidator(ContactsDbContext dbContext)
+    public UpdateContactCommandValidator(ContactsDbContext dbContext)
     {
         RuleFor(command => command.FirstName).NotEmpty();
         RuleFor(command => command.Surname).NotEmpty();
@@ -17,6 +17,6 @@ public sealed class CreateContactCommandValidator : AbstractValidator<CreateCont
         RuleFor(command => command.Iban)
             .NotEmpty()
             .MustBeValidIban()
-            .MustBeUniqueIban(dbContext, _ => Guid.Empty);
+            .MustBeUniqueIban(dbContext, command => command.Id);
     }
 }
