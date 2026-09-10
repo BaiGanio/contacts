@@ -1,3 +1,4 @@
+using Contacts.Api;
 using Contacts.Api.Auth;
 using Contacts.Api.Contacts;
 using Contacts.Api.Contacts.ClearContacts;
@@ -41,6 +42,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddContactServices();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddCors(options =>
 {
     // https://baiganio.github.io is GitHub Pages serving the built Angular app
@@ -54,6 +57,8 @@ builder.Services.AddCors(options =>
 var dummyAuth = builder.AddDummyAuth();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.UseSwagger();
 app.UseSwaggerUI();

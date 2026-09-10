@@ -5,6 +5,8 @@ using Contacts.Api.Contacts.GetContacts;
 using Contacts.Api.Contacts.UpdateContact;
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Contacts.Api.Contacts;
 
@@ -66,6 +68,16 @@ public static class ContactEndpoints
         {
             return Results.BadRequest(new { error = ex.Message });
         }
+        catch (DbUpdateException ex)
+        {
+            var conflict = TryIbanConflictProblem(ex);
+            if (conflict is null)
+            {
+                throw;
+            }
+
+            return conflict;
+        }
     }
 
     private static async Task<IResult> UpdateContactAsync(
@@ -99,6 +111,16 @@ public static class ContactEndpoints
         {
             return Results.BadRequest(new { error = ex.Message });
         }
+        catch (DbUpdateException ex)
+        {
+            var conflict = TryIbanConflictProblem(ex);
+            if (conflict is null)
+            {
+                throw;
+            }
+
+            return conflict;
+        }
     }
 
     private static async Task<IResult> DeleteContactAsync(
@@ -114,4 +136,23 @@ public static class ContactEndpoints
         Results.ValidationProblem(result.Errors
             .GroupBy(error => error.PropertyName)
             .ToDictionary(group => group.Key, group => group.Select(error => error.ErrorMessage).ToArray()));
+
+    // The uniqueness validators check the database before saving, so two concurrent requests can
+    // both pass that check and then race on the "IX_Contacts_Iban" unique index at save time. Only
+    // that specific constraint is translated to a friendly field error here; any other database
+    // failure is rethrown for the global exception handler to log and turn into a generic response.
+    private static IResult? TryIbanConflictProblem(DbUpdateException ex)
+    {
+        if (ex.InnerException is not PostgresException postgresException
+            || postgresException.SqlState != PostgresErrorCodes.UniqueViolation
+            || postgresException.ConstraintName != "IX_Contacts_Iban")
+        {
+            return null;
+        }
+
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["Iban"] = ["A contact with this IBAN already exists."],
+        });
+    }
 }
