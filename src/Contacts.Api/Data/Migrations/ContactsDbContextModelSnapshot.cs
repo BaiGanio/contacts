@@ -20,6 +20,7 @@ namespace Contacts.Api.Data.Migrations
                 .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Contacts.Api.Contacts.FailedImportRow", b =>
@@ -98,8 +99,18 @@ namespace Contacts.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FirstName");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("FirstName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("FirstName"), new[] { "gin_trgm_ops" });
+
                     b.HasIndex("Iban")
                         .IsUnique();
+
+                    b.HasIndex("Surname");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Surname"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Surname"), new[] { "gin_trgm_ops" });
 
                     b.ToTable("Contacts", (string)null);
                 });

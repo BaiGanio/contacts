@@ -55,6 +55,22 @@ inserted).
 Stop the database with `docker compose down` (add `-v` to also delete its
 data volume).
 
+### Clear the data to test fresh
+
+To empty the contacts table without dropping it or its migrations, truncate
+it directly:
+
+```sh
+docker exec -it lk-contacts-postgres-1 psql -U lk_contacts -d lk_contacts \
+  -c 'TRUNCATE TABLE "Contacts", "FailedImportRows";'
+```
+
+This keeps the schema and migration history, so no `dotnet ef database
+update` is needed afterward. Because the API seeds 300 contacts the first
+time it starts against an empty `Contacts` table, restarting the API right
+after this command re-adds those 300 rows — stop the API first, or import a
+different fixture instead, if you want the table to stay empty.
+
 When the EF model intentionally changes, create a migration from the repository
 root and then apply it:
 
@@ -64,6 +80,16 @@ dotnet ef migrations add <MigrationName> \
   --output-dir Data/Migrations
 dotnet ef database update --project src/Contacts.Api
 ```
+
+### Name search indexing
+
+`GET /api/contacts?search=` matches the search text anywhere inside the
+first name or surname (`ILIKE '%text%'`), so a plain index can't help — a
+leading wildcard defeats normal index lookups. `FirstName` and `Surname`
+each have a Postgres trigram (`pg_trgm`) GIN index instead, which indexes
+overlapping 3-character chunks of every name so a "contains" search can use
+an index. Measured against the 1,000,000-row fixture below: the trigram
+indexes cut a search from ~240ms (sequential scan) to under 1ms.
 
 ## Run the API
 
@@ -211,13 +237,12 @@ sends the chosen CSV to this endpoint, and reloads the table on success.
 ### Large-scale fixture (1,000,000 rows)
 
 `seed-data/contacts-03-poc-1000000.csv.gz` is a generated, 1,000,000-row
-fixture for testing paging and search at real scale, kept compressed in
-git (about 40 MB instead of about 97 MB) to keep the repository small.
-Every row has a valid, unique, checksum-correct IBAN across the FI, DE, and
-DK formats already used by the other fixtures. Names are randomly built
-from syllables rather than picked from a list, so the file has close to
-1,000,000 distinct first names and close to 1,000,000 distinct surnames —
-no single search term matches an unrealistically large slice of the file.
+fixture for testing paging, search, and import error handling at real
+scale, kept compressed in git (about 40 MB instead of about 97 MB) to keep
+the repository small. Names are randomly built from syllables rather than
+picked from a list, so the file has close to 1,000,000 distinct first names
+and close to 1,000,000 distinct surnames — no single search term matches an
+unrealistically large slice of the file.
 
 Four marker surnames are planted at exact, known counts, so a search can be
 pointed at a known answer instead of a random one:
@@ -228,6 +253,25 @@ pointed at a known answer instead of a random one:
 | `Smallgroup`   | 10 results        |
 | `Midgroup`     | 100 results       |
 | `Biggroup`     | 1,000 results     |
+
+Six rows are deliberately broken, one of each kind, so the import
+endpoint's error handling can be exercised at scale instead of just on
+hand-written test files. Every bad row's surname names its own kind, so it
+can be searched for directly:
+
+| Search for           | Kind                                                |
+| --------------------- | ---------------------------------------------------- |
+| `Badrowdupiban`       | IBAN already used by another row (rejected as a duplicate) |
+| `Badrowbadformat`     | IBAN too short to be a valid IBAN                    |
+| `Badrowbadchecksum`   | IBAN with the right shape but a wrong check digit    |
+| `Badrowbaddate`       | Date of birth that isn't a date at all                |
+| `Badrowfuturedob`     | Date of birth in the future                          |
+| `Badrowblank`         | Blank first name                                     |
+
+These six rows are expected to show up in the import response's error list
+(and in `GET /api/imports/failures`), not as saved contacts — the other
+999,994 rows, including all four marker surnames, should still import
+cleanly and be searchable afterward.
 
 The generator that built this file is checked in at
 `tools/seed-generator/` (not part of the API or web solution) — run

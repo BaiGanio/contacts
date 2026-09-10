@@ -12,6 +12,12 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Lets a plain index store substrings of a column, not just whole values, so
+        // ILIKE '%text%' searches (used by GetContactsHandler) can use an index
+        // instead of scanning every row — a plain btree index can't help a search
+        // with a leading wildcard.
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         var ibanConverter = new ValueConverter<Iban, string>(
             iban => iban.Value,
             value => new Iban(value));
@@ -45,6 +51,8 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
                 .HasMaxLength(34)
                 .IsRequired();
             contact.HasIndex(value => value.Iban).IsUnique();
+            contact.HasIndex(value => value.FirstName).HasMethod("gin").HasOperators("gin_trgm_ops");
+            contact.HasIndex(value => value.Surname).HasMethod("gin").HasOperators("gin_trgm_ops");
         });
 
         modelBuilder.Entity<FailedImportRow>(row =>
