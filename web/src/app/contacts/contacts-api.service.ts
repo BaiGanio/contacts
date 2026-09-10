@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 import {
   Contact,
@@ -48,7 +49,8 @@ function toContact(apiContact: ApiContact): Contact {
 export class ContactsApiService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
-  private readonly baseUrl = 'http://localhost:5187/api/contacts';
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/contacts`;
+  private readonly importFailuresUrl = `${environment.apiBaseUrl}/api/imports/failures`;
 
   private authHeaders(): HttpHeaders {
     const token = this.auth.token();
@@ -99,7 +101,7 @@ export class ContactsApiService {
 
   getImportFailures(limit = 100): Observable<FailedImportRows> {
     const params = new HttpParams().set('limit', limit);
-    return this.http.get<FailedImportRows>('http://localhost:5187/api/imports/failures', {
+    return this.http.get<FailedImportRows>(this.importFailuresUrl, {
       params,
       headers: this.authHeaders(),
     });
