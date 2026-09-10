@@ -158,13 +158,18 @@ A missing ID returns `404` for get, edit, and delete.
 `file`) with these required columns: `FirstName`, `Surname`, `DateOfBirth`
 (`yyyy-MM-dd`), `Street`, `City`, `PostalCode`, `Country`, `Phone`, and
 `Iban`. The address columns are combined into one string:
-`Street, PostalCode City, Country`. Files over 1 MB or 1,000 data rows are
-rejected outright (nothing is saved).
+`Street, PostalCode City, Country`. Files over 200 MB or 2,000,000 data
+rows are rejected outright (nothing is saved).
 
 Otherwise the import is row-by-row: a row that parses and does not repeat
 an IBAN is saved right away; a row that fails is skipped, listed in the
 response with its row number and error, and recorded in a small review
-queue instead of being silently dropped.
+queue instead of being silently dropped. Accepted rows are written to the
+database in batches of 5,000 rather than all at once, so a multi-million-row
+file does not hold everything in memory for one giant transaction.
+Importing the 1,000,000-row fixture below takes roughly 30–40 seconds on a
+typical development machine; this is a synchronous HTTP request end to end,
+so a large import means a real wait, not a background job.
 
 ### IBAN is unique
 
@@ -202,6 +207,40 @@ curl -i http://localhost:5187/api/contacts/import \
 
 The Angular page has an **Import file** button that opens a file picker,
 sends the chosen CSV to this endpoint, and reloads the table on success.
+
+### Large-scale fixture (1,000,000 rows)
+
+`seed-data/contacts-03-poc-1000000.csv.gz` is a generated, 1,000,000-row
+fixture for testing paging and search at real scale, kept compressed in
+git (about 40 MB instead of about 97 MB) to keep the repository small.
+Every row has a valid, unique, checksum-correct IBAN across the FI, DE, and
+DK formats already used by the other fixtures. Names are randomly built
+from syllables rather than picked from a list, so the file has close to
+1,000,000 distinct first names and close to 1,000,000 distinct surnames —
+no single search term matches an unrealistically large slice of the file.
+
+Four marker surnames are planted at exact, known counts, so a search can be
+pointed at a known answer instead of a random one:
+
+| Search for    | Expect exactly |
+| -------------- | --------------- |
+| `Uniqmarker`   | 1 result         |
+| `Smallgroup`   | 10 results        |
+| `Midgroup`     | 100 results       |
+| `Biggroup`     | 1,000 results     |
+
+The generator that built this file is checked in at
+`tools/seed-generator/` (not part of the API or web solution) — run
+`dotnet run -c Release` from that folder to regenerate or tweak it.
+
+Unzip the fixture, then import it the same way as the smaller fixtures,
+through the API or the Angular **Import file** button:
+
+```sh
+gunzip -k seed-data/contacts-03-poc-1000000.csv.gz
+curl -i http://localhost:5187/api/contacts/import \
+  -F 'file=@seed-data/contacts-03-poc-1000000.csv;type=text/csv'
+```
 
 ## Dummy token auth proof of concept
 
