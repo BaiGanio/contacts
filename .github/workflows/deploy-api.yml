@@ -1,14 +1,17 @@
 name: Build and push API image
 
-# Builds the API's container image and pushes it to GHCR on every push to master that
-# touches the API. Flux, already running on the Pi5 cluster, watches
-# ghcr.io/baiganio/contacts-api for the highest build number and rolls the Deployment
-# itself (see Infrastructure/Kubernetes/Contacts/flux/image-automation.yaml) — this
-# workflow never touches the cluster directly, no SSH key or kubeconfig needed here.
+# Builds the API's container image and pushes it to GHCR. Flux, already running on the
+# Pi5 cluster, watches ghcr.io/baiganio/contacts-api for the highest build number and
+# rolls the Deployment itself (see
+# Infrastructure/Kubernetes/Contacts/flux/image-automation.yaml) — this workflow never
+# touches the cluster directly, no SSH key or kubeconfig needed here.
+#
+# Called only by contacts.yml, after the verify workflow has passed for the pushed
+# commit — never triggered directly by push, so a failing test can't reach GHCR.
+# workflow_dispatch is kept for a manual rebuild/republish of the current master
+# without re-running the full verification suite.
 on:
-  push:
-    branches: [master]
-    paths: ["src/**", "Dockerfile", ".dockerignore", "Contacts.slnx"]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

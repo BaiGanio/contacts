@@ -200,8 +200,10 @@ npm test -- --no-watch
 
 ## Deploy the web application to GitHub Pages
 
-The `deploy-pages.yml` workflow builds and deploys the Angular application
-whenever `master` is pushed. In the repository's GitHub **Settings → Pages**,
+The `deploy-pages.yml` workflow builds and deploys the Angular application.
+It is called by `contacts.yml` after backend tests and the Playwright e2e
+suite pass for a pushed `master` commit that touches `web/**` — it no longer
+triggers on push directly. In the repository's GitHub **Settings → Pages**,
 set **Source** to **GitHub Actions**. The published site is:
 
 ```text

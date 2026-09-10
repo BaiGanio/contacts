@@ -1,9 +1,11 @@
 name: Deploy web app to GitHub Pages
 
+# Called only by contacts.yml, after the verify workflow has passed for the pushed
+# commit — never triggered directly by push, so a failing test can't reach Pages.
+# workflow_dispatch is kept for a manual rebuild/republish of the current master
+# without re-running the full verification suite.
 on:
-  push:
-    branches: [master]
-    paths: ["web/**"]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,57 @@
+name: Verify and deploy
+
+# The release gate: every push to master must pass the shared verify workflow
+# (backend build/tests + the 3 Playwright e2e scenarios) before either deployment
+# job is allowed to start. deploy-api.yml and deploy-pages.yml are called only from
+# here — they no longer trigger on push directly.
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'src/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'Contacts.slnx'
+            web:
+              - 'web/**'
+
+  verify:
+    uses: ./.github/workflows/verify.yml
+
+  deploy-api:
+    needs: [changes, verify]
+    if: needs.changes.outputs.api == 'true'
+    uses: ./.github/workflows/deploy-api.yml
+    permissions:
+      contents: read
+      packages: write
+
+  deploy-pages:
+    needs: [changes, verify]
+    if: needs.changes.outputs.web == 'true'
+    uses: ./.github/workflows/deploy-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
