@@ -1,0 +1,12 @@
+name: PR checks
+
+# Runs the shared verify workflow on every pull request targeting master, so a
+# problem is visible before merge. Does not deploy anything.
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
