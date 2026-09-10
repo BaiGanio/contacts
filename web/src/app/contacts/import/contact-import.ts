@@ -39,6 +39,7 @@ export class ContactImport {
   protected readonly importElapsedLabel = signal('0s');
   private importTimer: ReturnType<typeof setInterval> | null = null;
   private currentImportErrors: ImportRowError[] = [];
+  private currentImportTotalErrorCount = 0;
 
   openPicker(): void {
     this.fileInput().nativeElement.click();
@@ -48,7 +49,10 @@ export class ContactImport {
     this.dialog.open<ImportFailuresDialog, ImportFailuresDialogData>(ImportFailuresDialog, {
       width: '720px',
       maxWidth: 'calc(100vw - 32px)',
-      data: { currentImportErrors: this.currentImportErrors },
+      data: {
+        currentImportErrors: this.currentImportErrors,
+        totalErrorCount: this.currentImportTotalErrorCount,
+      },
     });
   }
 
@@ -81,6 +85,7 @@ export class ContactImport {
     this.importError.set(null);
     this.importFailedCount.set(0);
     this.currentImportErrors = [];
+    this.currentImportTotalErrorCount = 0;
     this.startImportTimer();
     this.contactsService.import(file).subscribe({
       next: (result) => {
@@ -89,11 +94,12 @@ export class ContactImport {
         if (result.importedCount > 0) {
           this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
         }
-        if (result.errors.length > 0) {
+        if (result.totalErrorCount > 0) {
           this.currentImportErrors = result.errors;
-          this.importFailedCount.set(result.errors.length);
+          this.currentImportTotalErrorCount = result.totalErrorCount;
+          this.importFailedCount.set(result.totalErrorCount);
           this.importError.set(
-            `Imported ${result.importedCount} contact(s). ${result.errors.length} row(s) failed to import.`,
+            `Imported ${result.importedCount} contact(s). ${result.totalErrorCount} row(s) failed to import.`,
           );
           return;
         }

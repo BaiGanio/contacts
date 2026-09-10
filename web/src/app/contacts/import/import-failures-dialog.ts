@@ -7,6 +7,7 @@ import { FailedImportRow, ImportRowError } from '../contacts.models';
 
 export interface ImportFailuresDialogData {
   currentImportErrors: ImportRowError[];
+  totalErrorCount: number;
 }
 
 @Component({
@@ -22,6 +23,9 @@ export interface ImportFailuresDialogData {
       } @else if (rows().length === 0) {
         <p class="table-status">No failed rows recorded.</p>
       } @else {
+        @if (data.totalErrorCount > rows().length) {
+          <p class="table-status">Showing {{ rows().length }} of {{ data.totalErrorCount }} failed rows.</p>
+        }
         <ul class="import-failures-list">
           @for (row of rows(); track row.rowHash) {
             <li class="import-failures-item">
@@ -43,7 +47,7 @@ export interface ImportFailuresDialogData {
 })
 export class ImportFailuresDialog {
   private readonly contactsService = inject(ContactsApiService);
-  private readonly data = inject<ImportFailuresDialogData>(MAT_DIALOG_DATA);
+  protected readonly data = inject<ImportFailuresDialogData>(MAT_DIALOG_DATA);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);

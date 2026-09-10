@@ -19,6 +19,7 @@ export interface ImportRowError {
 export interface ImportResult {
   importedCount: number;
   errors: ImportRowError[];
+  totalErrorCount: number;
 }
 
 export interface FailedImportRow {
