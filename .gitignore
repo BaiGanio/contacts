@@ -3,6 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Large seed-data fixture kept only in compressed form in git
+# (see seed-data/contacts-03-poc-1000000.csv.gz)
+seed-data/contacts-03-poc-1000000.csv
+
 # User-specific files
 *.rsuser
 *.suo
@@ -13,6 +17,7 @@
 var/
 archive/
 AGENTS.md
+tools/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
