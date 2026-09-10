@@ -276,8 +276,8 @@ if (authEnabled)
 using (var seedScope = app.Services.CreateScope())
 {
     var dbContext = seedScope.ServiceProvider.GetRequiredService<ContactsDbContext>();
-    var seedCsvPath = Path.Combine(app.Environment.ContentRootPath, "..", "..", "seed-data", "contacts-02-poc-300.csv");
-    await ContactsSeeder.SeedFromCsvAsync(dbContext, seedCsvPath, app.Logger);
+    await ContactsDatabaseInitializer.InitializeAsync(
+        dbContext, app.Configuration, AppContext.BaseDirectory, app.Logger);
 }
 
 app.Run();

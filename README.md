@@ -34,23 +34,40 @@ dotnet test Contacts.slnx
 
 ## Create or update the development database
 
-The development configuration uses PostgreSQL. Start it with Docker Compose,
-then apply all checked-in migrations:
+The development configuration uses PostgreSQL. Start it with Docker Compose:
 
 ```sh
 docker compose up -d
-dotnet ef database update --project src/Contacts.Api
 ```
 
 This starts a local PostgreSQL container (database, user, and password all
 `lk_contacts`) with its data kept in a named Docker volume, so it survives
 container restarts. The migrations and PostgreSQL configuration remain
 checked in, so every developer can create the same database locally. The
-migrations themselves create only an empty table. The first time the API
+migrations are applied automatically when the development API starts. The first time the API
 starts against an empty database, it seeds the 300 contacts from
 `seed-data/contacts-02-poc-300.csv`, validating each row through the same
 domain rules as a normal create (invalid rows are skipped and logged, not
 inserted).
+
+`Database:ApplyMigrations` and `Seed:Enabled` are both `false` by default and
+`true` in the Development profile. Set `Seed__Enabled=false` to keep an empty
+database empty. `Seed:CsvPath` defaults to `seed-data/contacts-02-poc-300.csv`;
+use `Seed__CsvPath=seed-data/contacts-01-initial-5.csv` for the smaller fixture.
+Relative seed paths are resolved from the API binary directory. Both small
+fixtures are copied into build and publish output; the million-row fixture is not.
+Seeding skips a nonempty contacts table and never resets existing contacts.
+
+For another PostgreSQL server, supply `ConnectionStrings__Contacts` through
+the environment. Enable `Database__ApplyMigrations=true` and, if wanted,
+`Seed__Enabled=true` explicitly. PostgreSQL must already be running, and the
+configured user needs schema migration permissions (plus database creation
+permission if the database does not yet exist). Startup fails if enabled
+initialization fails. With automatic migration disabled, apply migrations manually:
+
+```sh
+dotnet ef database update --project src/Contacts.Api --connection '<connection string>'
+```
 
 Stop the database with `docker compose down` (add `-v` to also delete its
 data volume).
@@ -117,7 +134,7 @@ much larger and deep unfiltered browsing turns out to matter in practice.
 
 ## Run the API
 
-Apply the migrations first, then start the development profile:
+Start PostgreSQL first, then start the development profile (it applies migrations):
 
 ```sh
 dotnet run --project src/Contacts.Api --launch-profile http

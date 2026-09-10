@@ -22,4 +22,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Content Include="../../seed-data/contacts-01-initial-5.csv;../../seed-data/contacts-02-poc-300.csv"
+             Link="seed-data/%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
