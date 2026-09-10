@@ -374,11 +374,12 @@ curl -s -X POST http://localhost:5187/api/auth/token \
 ```
 
 This returns a short-lived signed JWT: `{"token": "..."}`. Requests without
-a valid token get `401 Unauthorized`. Paste the token into the **Auth
-token** field at the top of the Angular page and click **Log in**; the app
-holds it in `localStorage` and sends it as an `Authorization: Bearer`
-header on every API call. If the flag is on and no token is stored yet,
-the page shows a "Not authenticated" message.
+a valid token get `401 Unauthorized`. Enter the username and password into
+the **Log in** dialog at the top of the Angular page; the dialog calls
+`/api/auth/token` itself and the app holds the returned token in
+`localStorage`, sending it as an `Authorization: Bearer` header on every
+API call. If the flag is on and no token is stored yet, the page shows a
+"Not authenticated" message.
 
 ### Frontend write gating
 
@@ -389,5 +390,5 @@ a token is logged in — the frontend has no way to read the API's
 default), every action just works, same as before this PoC existed. While
 the flag is on, an action without a valid token gets a `401` from the
 API, and the page shows "Not authenticated. Use the login icon in the top
-bar, then try again." Logging in through the existing token dialog fixes
-this immediately, no reload needed.
+bar, then try again." Logging in through the login dialog fixes this
+immediately, no reload needed.
