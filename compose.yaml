@@ -1,0 +1,16 @@
+name: lk-contacts
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: lk_contacts
+      POSTGRES_USER: lk_contacts
+      POSTGRES_PASSWORD: lk_contacts
+    ports:
+      - "5432:5432"
+    volumes:
+      - lk-contacts-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  lk-contacts-postgres-data:

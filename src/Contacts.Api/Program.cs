@@ -33,7 +33,7 @@ var signingCredentials = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signing
 
 ValidatorOptions.Global.LanguageManager.Enabled = false;
 
-builder.Services.AddDbContext<ContactsDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddDbContext<ContactsDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
