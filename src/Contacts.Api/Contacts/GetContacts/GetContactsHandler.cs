@@ -16,8 +16,8 @@ public sealed class GetContactsHandler(ContactsDbContext dbContext)
         {
             var pattern = $"%{query.Search.Trim()}%";
             contactsQuery = contactsQuery.Where(contact =>
-                EF.Functions.Like(contact.FirstName, pattern) ||
-                EF.Functions.Like(contact.Surname, pattern));
+                EF.Functions.ILike(contact.FirstName, pattern) ||
+                EF.Functions.ILike(contact.Surname, pattern));
         }
 
         var totalCount = await contactsQuery.CountAsync(cancellationToken);
