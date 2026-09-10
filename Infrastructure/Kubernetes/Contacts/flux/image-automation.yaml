@@ -19,12 +19,14 @@ metadata:
 spec:
   imageRepositoryRef:
     name: contacts-api
+  # Tags are plain build numbers (github.run_number), not vX.Y.Z — every push to master
+  # that touches the API builds and pushes automatically, no manual git tag needed.
+  # numerical/asc just means "pick the highest number".
   policy:
-    semver:
-      range: ">=0.0.0"
-  # Resolves the winning semver tag's digest too, so the setter below can pin
-  # "tag@digest" in one shot. IfNotPresent: each vX.Y.Z tag from the GitHub Actions
-  # workflow is built and pushed exactly once and never overwritten.
+    numerical:
+      order: asc
+  # Resolves the winning tag's digest too, so the setter below can pin "tag@digest" in
+  # one shot. IfNotPresent: each build number is pushed exactly once and never overwritten.
   digestReflectionPolicy: IfNotPresent
 ---
 apiVersion: image.toolkit.fluxcd.io/v1

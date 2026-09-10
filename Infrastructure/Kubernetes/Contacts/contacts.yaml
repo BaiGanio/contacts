@@ -74,8 +74,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: contacts-api
-          # ghcr.io/baiganio/contacts-api is public, so no imagePullSecrets is needed.
-          image: ghcr.io/baiganio/contacts-api:0.1.0 # {"$imagepolicy": "contacts:contacts-api"}
+          image: ghcr.io/baiganio/contacts-api:1 # {"$imagepolicy": "contacts:contacts-api"}
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true

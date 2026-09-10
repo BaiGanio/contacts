@@ -1,12 +1,14 @@
 name: Build and push API image
 
-# Builds the API's container image and pushes it to GHCR. Flux, already running on the
-# Pi5 cluster, watches ghcr.io/baiganio/contacts-api for new semver tags and rolls the
-# Deployment itself (see Infrastructure/Kubernetes/Contacts/flux/image-automation.yaml) —
-# this workflow never touches the cluster directly, no SSH key or kubeconfig needed here.
+# Builds the API's container image and pushes it to GHCR on every push to master that
+# touches the API. Flux, already running on the Pi5 cluster, watches
+# ghcr.io/baiganio/contacts-api for the highest build number and rolls the Deployment
+# itself (see Infrastructure/Kubernetes/Contacts/flux/image-automation.yaml) — this
+# workflow never touches the cluster directly, no SSH key or kubeconfig needed here.
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [master]
+    paths: ["src/**", "Dockerfile", ".dockerignore", "Contacts.slnx"]
   workflow_dispatch:
 
 permissions:
@@ -19,10 +21,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-
-      - name: Read version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -44,4 +42,6 @@ jobs:
           # Pi5 is ARM64 only; no amd64 build needed.
           platforms: linux/arm64
           push: true
-          tags: ghcr.io/baiganio/contacts-api:${{ steps.version.outputs.version }}
+          # github.run_number always goes up, one per workflow run, so Flux's numerical
+          # ImagePolicy can always tell which build is newest without a hand-made git tag.
+          tags: ghcr.io/baiganio/contacts-api:${{ github.run_number }}
