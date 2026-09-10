@@ -99,12 +99,12 @@ public sealed class ImportContactsHandler(ContactsDbContext dbContext)
             else
             {
                 totalErrorCount++;
+                var rowHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawRow)));
                 if (errorSample.Count < MaxErrorSample)
                 {
-                    errorSample.Add(new ImportRowError(row, errorMessage!));
+                    errorSample.Add(new ImportRowError(row, errorMessage!, rowHash));
                 }
 
-                var rowHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawRow)));
                 failedRowsToSave.Add((rowHash, row, rawRow, errorMessage!));
 
                 // Flushed in bounded batches too, same as contacts, so a file with a huge

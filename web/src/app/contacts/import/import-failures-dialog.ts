@@ -54,17 +54,12 @@ export class ImportFailuresDialog {
   protected readonly rows = signal<FailedImportRow[]>([]);
 
   constructor() {
-    const currentErrorKeys = new Set(
-      this.data.currentImportErrors.map((currentError) => `${currentError.row} ${currentError.message}`),
-    );
-    const fetchLimit = Math.max(100, currentErrorKeys.size);
+    const rowHashes = this.data.currentImportErrors.map((currentError) => currentError.rowHash);
 
-    this.contactsService.getImportFailures(fetchLimit).subscribe({
+    this.contactsService.getImportFailures(rowHashes.length, rowHashes).subscribe({
       next: (result) => {
         this.loading.set(false);
-        this.rows.set(
-          result.items.filter((row) => currentErrorKeys.has(`${row.rowNumber} ${row.errorMessage}`)),
-        );
+        this.rows.set(result.items);
       },
       error: () => {
         this.loading.set(false);

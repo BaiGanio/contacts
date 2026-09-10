@@ -14,6 +14,7 @@ export type ContactEdits = Omit<Contact, 'id'>;
 export interface ImportRowError {
   row: number;
   message: string;
+  rowHash: string;
 }
 
 export interface ImportResult {

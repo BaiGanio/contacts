@@ -66,8 +66,11 @@ export class ContactsApiService {
     return this.http.post<ImportResult>(`${this.baseUrl}/import`, formData, { headers: this.authHeaders() });
   }
 
-  getImportFailures(limit = 100): Observable<FailedImportRows> {
-    const params = new HttpParams().set('limit', limit);
+  getImportFailures(limit = 100, rowHashes?: string[]): Observable<FailedImportRows> {
+    let params = new HttpParams().set('limit', limit);
+    if (rowHashes?.length) {
+      params = params.set('rowHashes', rowHashes.join(','));
+    }
     return this.http.get<FailedImportRows>(this.importFailuresUrl, {
       params,
       headers: this.authHeaders(),
