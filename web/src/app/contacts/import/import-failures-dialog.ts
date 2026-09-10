@@ -1,9 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { ContactsApiService } from '../contacts-api.service';
-import { FailedImportRow } from '../contacts.models';
+import { FailedImportRow, ImportRowError } from '../contacts.models';
+
+export interface ImportFailuresDialogData {
+  currentImportErrors: ImportRowError[];
+}
 
 @Component({
   selector: 'app-import-failures-dialog',
@@ -18,18 +22,13 @@ import { FailedImportRow } from '../contacts.models';
       } @else if (rows().length === 0) {
         <p class="table-status">No failed rows recorded.</p>
       } @else {
-        @if (totalCount() > rows().length) {
-          <p class="table-status">
-            Showing the {{ rows().length }} most recently seen of {{ totalCount() }} distinct failing rows.
-          </p>
-        }
         <ul class="import-failures-list">
           @for (row of rows(); track row.rowHash) {
             <li class="import-failures-item">
               <p class="import-failures-error">{{ row.errorMessage }}</p>
               <p class="import-failures-raw">{{ row.rawRow }}</p>
               <p class="import-failures-meta">
-                Seen {{ row.attempts }}x, last on {{ row.lastSeenAtUtc | date: 'short' }}
+                Row {{ row.rowNumber }}, last seen {{ row.lastSeenAtUtc | date: 'short' }}
               </p>
             </li>
           }
@@ -44,18 +43,24 @@ import { FailedImportRow } from '../contacts.models';
 })
 export class ImportFailuresDialog {
   private readonly contactsService = inject(ContactsApiService);
+  private readonly data = inject<ImportFailuresDialogData>(MAT_DIALOG_DATA);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly rows = signal<FailedImportRow[]>([]);
-  protected readonly totalCount = signal(0);
 
   constructor() {
-    this.contactsService.getImportFailures().subscribe({
+    const currentErrorKeys = new Set(
+      this.data.currentImportErrors.map((currentError) => `${currentError.row} ${currentError.message}`),
+    );
+    const fetchLimit = Math.max(100, currentErrorKeys.size);
+
+    this.contactsService.getImportFailures(fetchLimit).subscribe({
       next: (result) => {
         this.loading.set(false);
-        this.rows.set(result.items);
-        this.totalCount.set(result.totalCount);
+        this.rows.set(
+          result.items.filter((row) => currentErrorKeys.has(`${row.rowNumber} ${row.errorMessage}`)),
+        );
       },
       error: () => {
         this.loading.set(false);

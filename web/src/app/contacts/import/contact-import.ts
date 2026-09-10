@@ -6,9 +6,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Store } from '@ngrx/store';
 import { isUnauthorized } from '../http-errors';
 import { ContactsApiService } from '../contacts-api.service';
+import { ImportRowError } from '../contacts.models';
 import { ContactsActions } from '../state/contacts.actions';
 import { selectPageSize } from '../state/contacts.selectors';
-import { ImportFailuresDialog } from './import-failures-dialog';
+import { ImportFailuresDialog, ImportFailuresDialogData } from './import-failures-dialog';
 
 /**
  * Owns the CSV upload trigger, progress, result, and timer cleanup end to
@@ -37,13 +38,18 @@ export class ContactImport {
   protected readonly importFailedCount = signal(0);
   protected readonly importElapsedLabel = signal('0s');
   private importTimer: ReturnType<typeof setInterval> | null = null;
+  private currentImportErrors: ImportRowError[] = [];
 
   openPicker(): void {
     this.fileInput().nativeElement.click();
   }
 
   protected openImportFailuresDialog(): void {
-    this.dialog.open(ImportFailuresDialog, { width: '720px', maxWidth: 'calc(100vw - 32px)' });
+    this.dialog.open<ImportFailuresDialog, ImportFailuresDialogData>(ImportFailuresDialog, {
+      width: '720px',
+      maxWidth: 'calc(100vw - 32px)',
+      data: { currentImportErrors: this.currentImportErrors },
+    });
   }
 
   private startImportTimer(): void {
@@ -74,6 +80,7 @@ export class ContactImport {
     this.importing.set(true);
     this.importError.set(null);
     this.importFailedCount.set(0);
+    this.currentImportErrors = [];
     this.startImportTimer();
     this.contactsService.import(file).subscribe({
       next: (result) => {
@@ -83,6 +90,7 @@ export class ContactImport {
           this.store.dispatch(ContactsActions.setPage({ pageIndex: 0, pageSize: this.pageSize() }));
         }
         if (result.errors.length > 0) {
+          this.currentImportErrors = result.errors;
           this.importFailedCount.set(result.errors.length);
           this.importError.set(
             `Imported ${result.importedCount} contact(s). ${result.errors.length} row(s) failed to import.`,
