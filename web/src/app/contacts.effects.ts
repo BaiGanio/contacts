@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
-import { catchError, map, mergeMap, of, switchMap, withLatestFrom } from 'rxjs';
+import { catchError, filter, map, mergeMap, of, switchMap, withLatestFrom } from 'rxjs';
 import { ContactsActions } from './contacts.actions';
-import { selectListQuery } from './contacts.selectors';
+import { selectListQuery, selectPageIndex, selectPageSize } from './contacts.selectors';
 import { ContactsService } from './contacts.service';
 
 const LOAD_ERROR_MESSAGE = 'Could not load contacts. Check that the API is running, then try again.';
@@ -41,10 +41,10 @@ export class ContactsEffects {
   createContact$ = createEffect(() =>
     this.actions$.pipe(
       ofType(ContactsActions.createContact),
-      mergeMap(({ contact }) =>
+      mergeMap(({ requestId, contact }) =>
         this.contactsService.create(contact).pipe(
-          map((created) => ContactsActions.createContactSuccess({ contact: created })),
-          catchError((error) => of(ContactsActions.createContactFailure({ error }))),
+          map((created) => ContactsActions.createContactSuccess({ requestId, contact: created })),
+          catchError((error) => of(ContactsActions.createContactFailure({ requestId, error }))),
         ),
       ),
     ),
@@ -53,10 +53,10 @@ export class ContactsEffects {
   updateContact$ = createEffect(() =>
     this.actions$.pipe(
       ofType(ContactsActions.updateContact),
-      mergeMap(({ id, edits }) =>
+      mergeMap(({ requestId, id, edits }) =>
         this.contactsService.update(id, edits).pipe(
-          map((updated) => ContactsActions.updateContactSuccess({ contact: updated })),
-          catchError((error) => of(ContactsActions.updateContactFailure({ error }))),
+          map((updated) => ContactsActions.updateContactSuccess({ requestId, contact: updated })),
+          catchError((error) => of(ContactsActions.updateContactFailure({ requestId, error }))),
         ),
       ),
     ),
@@ -65,10 +65,10 @@ export class ContactsEffects {
   deleteContact$ = createEffect(() =>
     this.actions$.pipe(
       ofType(ContactsActions.deleteContact),
-      mergeMap(({ id }) =>
+      mergeMap(({ requestId, id }) =>
         this.contactsService.delete(id).pipe(
-          map(() => ContactsActions.deleteContactSuccess({ id })),
-          catchError((error) => of(ContactsActions.deleteContactFailure({ id, error }))),
+          map(() => ContactsActions.deleteContactSuccess({ requestId, id })),
+          catchError((error) => of(ContactsActions.deleteContactFailure({ requestId, id, error }))),
         ),
       ),
     ),
@@ -82,6 +82,17 @@ export class ContactsEffects {
         ContactsActions.deleteContactSuccess,
       ),
       map(() => ContactsActions.loadContacts()),
+    ),
+  );
+
+  correctPageOverflow$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(ContactsActions.loadContactsSuccess),
+      withLatestFrom(this.store.select(selectPageIndex), this.store.select(selectPageSize)),
+      filter(([{ contacts, totalCount }, pageIndex]) => contacts.length === 0 && totalCount > 0 && pageIndex > 0),
+      map(([{ totalCount }, , pageSize]) =>
+        ContactsActions.setPage({ pageIndex: Math.max(0, Math.ceil(totalCount / pageSize) - 1), pageSize }),
+      ),
     ),
   );
 }

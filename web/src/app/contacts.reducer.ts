@@ -10,16 +10,23 @@ export const contactsReducer = createReducer(
     ...state,
     loading: true,
     error: null,
+    unauthorized: false,
   })),
   on(ContactsActions.setPage, (state, { pageIndex, pageSize }): ContactsState => ({
     ...state,
     pageIndex,
     pageSize,
+    loading: true,
+    error: null,
+    unauthorized: false,
   })),
   on(ContactsActions.setSearch, (state, { search }): ContactsState => ({
     ...state,
     search,
     pageIndex: 0,
+    loading: true,
+    error: null,
+    unauthorized: false,
   })),
   on(ContactsActions.loadContactsSuccess, (state, { contacts, totalCount }): ContactsState => ({
     ...state,
@@ -31,6 +38,8 @@ export const contactsReducer = createReducer(
   })),
   on(ContactsActions.loadContactsFailure, (state, { message, unauthorized }): ContactsState => ({
     ...state,
+    contacts: [],
+    totalCount: 0,
     loading: false,
     error: message,
     unauthorized,

@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { afterNextRender, Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -116,6 +116,7 @@ export class ContactDialog {
   private readonly dialogRef = inject(MatDialogRef<ContactDialog, Contact>);
   private readonly store = inject(Store);
   private readonly actions$ = inject(Actions);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly data = inject<ContactDialogData>(MAT_DIALOG_DATA);
 
   protected readonly submitting = signal(false);
@@ -131,6 +132,9 @@ export class ContactDialog {
   });
 
   protected save(): void {
+    if (this.submitting()) {
+      return;
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -149,6 +153,8 @@ export class ContactDialog {
     this.submitting.set(true);
     this.submitError.set(null);
 
+    const requestId = crypto.randomUUID();
+
     this.actions$
       .pipe(
         ofType(
@@ -157,7 +163,9 @@ export class ContactDialog {
           ContactsActions.updateContactSuccess,
           ContactsActions.updateContactFailure,
         ),
+        filter((action) => action.requestId === requestId),
         take(1),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((action) => {
         this.submitting.set(false);
@@ -171,9 +179,9 @@ export class ContactDialog {
       });
 
     if (this.data.contact) {
-      this.store.dispatch(ContactsActions.updateContact({ id: this.data.contact.id, edits }));
+      this.store.dispatch(ContactsActions.updateContact({ requestId, id: this.data.contact.id, edits }));
     } else {
-      this.store.dispatch(ContactsActions.createContact({ contact: edits as NewContact }));
+      this.store.dispatch(ContactsActions.createContact({ requestId, contact: edits as NewContact }));
     }
   }
 
@@ -223,20 +231,27 @@ export class DeleteConfirmDialog {
   private readonly dialogRef = inject(MatDialogRef<DeleteConfirmDialog, boolean>);
   private readonly store = inject(Store);
   private readonly actions$ = inject(Actions);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly data = inject<DeleteConfirmDialogData>(MAT_DIALOG_DATA);
 
   protected readonly deleting = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected confirmDelete(): void {
+    if (this.deleting()) {
+      return;
+    }
     this.deleting.set(true);
     this.error.set(null);
+
+    const requestId = crypto.randomUUID();
 
     this.actions$
       .pipe(
         ofType(ContactsActions.deleteContactSuccess, ContactsActions.deleteContactFailure),
-        filter((action) => action.id === this.data.contact.id),
+        filter((action) => action.requestId === requestId),
         take(1),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((action) => {
         this.deleting.set(false);
@@ -251,7 +266,7 @@ export class DeleteConfirmDialog {
         this.dialogRef.close(true);
       });
 
-    this.store.dispatch(ContactsActions.deleteContact({ id: this.data.contact.id }));
+    this.store.dispatch(ContactsActions.deleteContact({ requestId, id: this.data.contact.id }));
   }
 }
 
