@@ -13,38 +13,11 @@ import {
   NewContact,
 } from './contacts.models';
 
-interface ApiContact {
-  id: string;
-  firstName: string;
-  surname: string;
-  dateOfBirth: string;
-  address: string;
-  phoneNumber: string;
-  iban: { value: string };
-}
-
 interface ApiPagedContacts {
-  items: ApiContact[];
+  items: Contact[];
   totalCount: number;
 }
 
-function toContact(apiContact: ApiContact): Contact {
-  return {
-    id: apiContact.id,
-    firstName: apiContact.firstName,
-    surname: apiContact.surname,
-    dateOfBirth: apiContact.dateOfBirth,
-    address: apiContact.address,
-    phoneNumber: apiContact.phoneNumber,
-    iban: apiContact.iban.value,
-  };
-}
-
-/**
- * Talks to the current GET/POST /api/contacts endpoints and unwraps the
- * API's raw response shape (including its `{ value: string }` IBAN
- * representation) so the rest of the app can use one flat Contact model.
- */
 @Injectable({ providedIn: 'root' })
 export class ContactsApiService {
   private readonly http = inject(HttpClient);
@@ -65,28 +38,22 @@ export class ContactsApiService {
 
     return this.http.get<ApiPagedContacts>(this.baseUrl, { params, headers: this.authHeaders() }).pipe(
       map((page) => ({
-        contacts: page.items.map(toContact),
+        contacts: page.items,
         totalCount: page.totalCount,
       })),
     );
   }
 
   create(contact: NewContact): Observable<Contact> {
-    return this.http
-      .post<ApiContact>(this.baseUrl, contact, { headers: this.authHeaders() })
-      .pipe(map(toContact));
+    return this.http.post<Contact>(this.baseUrl, contact, { headers: this.authHeaders() });
   }
 
   getById(id: string): Observable<Contact> {
-    return this.http
-      .get<ApiContact>(`${this.baseUrl}/${id}`, { headers: this.authHeaders() })
-      .pipe(map(toContact));
+    return this.http.get<Contact>(`${this.baseUrl}/${id}`, { headers: this.authHeaders() });
   }
 
   update(id: string, edits: ContactEdits): Observable<Contact> {
-    return this.http
-      .put<ApiContact>(`${this.baseUrl}/${id}`, edits, { headers: this.authHeaders() })
-      .pipe(map(toContact));
+    return this.http.put<Contact>(`${this.baseUrl}/${id}`, edits, { headers: this.authHeaders() });
   }
 
   delete(id: string): Observable<void> {
