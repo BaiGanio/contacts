@@ -155,6 +155,31 @@ npm run build
 npm test -- --no-watch
 ```
 
+## Deploy the web application to GitHub Pages
+
+The `deploy-pages.yml` workflow builds and deploys the Angular application
+whenever `master` is pushed. In the repository's GitHub **Settings → Pages**,
+set **Source** to **GitHub Actions**. The published site is:
+
+```text
+https://baiganio.github.io/contacts/
+```
+
+The Pages build uses `/contacts/` as Angular's base URL so its scripts, styles,
+fonts, and favicon resolve beneath the repository path. Run the same build
+locally with:
+
+```sh
+cd web
+npm run build:pages
+```
+
+GitHub Pages hosts only the static Angular application. Until a public API is
+available, the page loads normally and shows its existing API connection error.
+When the API is deployed, set its HTTPS origin in
+`web/src/environments/environment.prod.ts` and allow
+`https://baiganio.github.io` in the API's production CORS policy.
+
 Read the seeded contacts directly with:
 
 ```sh
