@@ -1,20 +1,20 @@
 # Contacts web
 
-This is the client-only Angular visual proof. Its contacts are intentionally
-held in memory and it does not call the API yet.
+Angular Material frontend for the Contacts API, with ngrx Store and Effects for
+contact browsing and CRUD actions. Contacts are persisted in PostgreSQL through
+the API.
 
-Install dependencies and start the development server:
+Follow the [root README](../README.md#local-quick-start) to start PostgreSQL and
+the API first. Then, from this `web/` folder:
 
 ```sh
-npm install
+npm ci
 npm start
 ```
 
-Open `http://localhost:5186`.
+Open [the application](http://localhost:5186). Development calls the API at
+`http://localhost:5187`; `npm run build` creates a production build targeting the
+hosted API.
 
-Build and test:
-
-```sh
-npm run build
-npm test -- --no-watch
-```
+See [build and test instructions](../README.md#build-and-test) for the Angular
+production build and Playwright browser tests. There are no frontend unit tests.

@@ -1,28 +1,108 @@
 # Contacts
 
-## Prerequisites
+A contacts manager built with .NET Minimal API, EF Core, PostgreSQL, Angular
+Material, and ngrx Store. Create, edit, delete, search, and page through persisted
+contacts, or import them from CSV. Each contact has a first name, surname, date
+of birth, address, phone number, and a validated, unique IBAN.
 
-- .NET SDK 10
-- EF Core command-line tools 10.0.8
-- Node.js 26
-- npm 11
-- Docker (to run PostgreSQL locally)
+## Live demo
 
-Check the installed tools:
+- [Open the application](https://baiganio.github.io/contacts/)
+- [Open the API in Swagger](https://contacts-api.baiganio.io/swagger/index.html)
+
+Use the login icon in the application's top bar with **demo / demo** when
+prompted to authenticate. In Swagger, call `POST /api/auth/token` with those
+credentials, then click **Authorize** and paste the returned token without a
+`Bearer` prefix. The hosted demo uses shared data, so its contact count may vary.
+
+Authentication is an optional dummy-token proof of concept, not real security.
+It is **off by default locally**; the local quick start requires no login.
+
+## Local quick start
+
+### Prerequisites
+
+Install .NET SDK 10, Node.js 26, npm 11, and Docker with Docker Compose.
+Start Docker before continuing. Check the tools with:
 
 ```sh
 dotnet --version
-dotnet ef --version
-docker --version
+node --version
+npm --version
+docker compose version
 ```
 
-If `dotnet ef` is not installed:
+Clone or extract the repository and open a terminal in its root folder (the
+folder containing `Contacts.slnx` and `compose.yaml`). All command blocks below
+start from that folder unless stated otherwise. EF command-line tools are only
+needed for [manual migration work](docs/TECHNICAL-NOTES.md#database-configuration).
+
+### Terminal 1: start PostgreSQL and the API
 
 ```sh
-dotnet tool install --global dotnet-ef --version 10.0.8
+docker compose up -d
+docker compose exec postgres pg_isready -U lk_contacts -d lk_contacts
+dotnet run --project src/Contacts.Api --launch-profile http
 ```
 
+Wait for `pg_isready` to report **accepting connections** before starting the API;
+repeat that command if PostgreSQL is still starting. On first use, Docker needs
+to download the PostgreSQL image and .NET restores the backend packages.
+
+The API applies migrations automatically. If the contacts table is empty, it
+loads the 300-row CSV fixture. Existing contacts are preserved across restarts.
+Keep this terminal running and wait for the API to report that it is listening.
+
+### Terminal 2: start Angular
+
+Open a second terminal at the repository root:
+
+```sh
+cd web
+npm ci
+npm start
+```
+
+Keep this terminal running too. Open [the application](http://localhost:5186)
+and [local Swagger](http://localhost:5187/swagger).
+
+| Component | Local address |
+| --- | --- |
+| Angular application | `http://localhost:5186` |
+| API | `http://localhost:5187` |
+| PostgreSQL | `localhost:5432` |
+
+The local database name, username, and password are all `lk_contacts`.
+Angular calls the local API directly, with CORS configured for its origin.
+
+### Try the application
+
+1. On a fresh database, confirm the table shows **300 contacts**. Search for
+   `Löwe`, clear the search, and use the paginator to browse another page.
+2. Add a contact using all six fields. For a valid example IBAN, use
+   `GB82 WEST 1234 5698 7654 32` (provided another contact has not used it).
+3. Search for your new contact, edit it, and reload the page to check persistence.
+   Delete it using the row action and confirmation dialog.
+4. Try saving an empty form or an invalid IBAN to see validation errors.
+5. Choose **Import file** and select `seed-data/contacts-01-initial-5.csv`.
+   Its five contacts already exist in the default 300-row seed, so expect
+   **0 imported and 5 duplicate errors**. Click **View failed rows** for details.
+
+To check successful imports, follow the [empty-database import walkthrough](docs/TECHNICAL-NOTES.md#test-imports-with-an-empty-local-database)
+or run the Playwright suite below, which verifies both supplied fixtures.
+
+### Stop the application
+
+Press `Ctrl+C` in both application terminals. From the repository root, run
+`docker compose down` to stop PostgreSQL. Its named volume retains your data;
+adding `-v` deletes that volume and all local database data.
+
 ## Build and test
+
+PostgreSQL must be running for backend and browser tests. If needed, start it
+and check readiness using the commands in the quick start.
+
+### Backend
 
 From the repository root:
 
@@ -32,396 +112,84 @@ dotnet build Contacts.slnx
 dotnet test Contacts.slnx
 ```
 
-## Create or update the development database
+The xUnit suite checks domain behavior and persistence. The persistence test
+creates and removes a temporary database using the local Compose credentials.
+It does not require a running API.
 
-The development configuration uses PostgreSQL. Start it with Docker Compose:
+### Angular production build
 
-```sh
-docker compose up -d
-```
-
-This starts a local PostgreSQL container (database, user, and password all
-`lk_contacts`) with its data kept in a named Docker volume, so it survives
-container restarts. The migrations and PostgreSQL configuration remain
-checked in, so every developer can create the same database locally. The
-migrations are applied automatically when the development API starts. The first time the API
-starts against an empty database, it seeds the 300 contacts from
-`seed-data/contacts-02-poc-300.csv`, validating each row through the same
-domain rules as a normal create (invalid rows are skipped and logged, not
-inserted).
-
-`Database:ApplyMigrations` and `Seed:Enabled` are both `false` by default and
-`true` in the Development profile. Set `Seed__Enabled=false` to keep an empty
-database empty. `Seed:CsvPath` defaults to `seed-data/contacts-02-poc-300.csv`;
-use `Seed__CsvPath=seed-data/contacts-01-initial-5.csv` for the smaller fixture.
-Relative seed paths are resolved from the API binary directory. Both small
-fixtures are copied into build and publish output; the million-row fixture is not.
-Seeding skips a nonempty contacts table and never resets existing contacts.
-
-For another PostgreSQL server, supply `ConnectionStrings__Contacts` through
-the environment. Enable `Database__ApplyMigrations=true` and, if wanted,
-`Seed__Enabled=true` explicitly. PostgreSQL must already be running, and the
-configured user needs schema migration permissions (plus database creation
-permission if the database does not yet exist). Startup fails if enabled
-initialization fails. With automatic migration disabled, apply migrations manually:
+From the repository root:
 
 ```sh
-dotnet ef database update --project src/Contacts.Api --connection '<connection string>'
+npm --prefix web ci
+npm --prefix web run build
 ```
 
-Stop the database with `docker compose down` (add `-v` to also delete its
-data volume).
+The production build targets the hosted API; `npm start` uses the local API.
+There are no Angular unit tests. Frontend behavior is tested with Playwright.
 
-### Clear the data to test fresh
+### Playwright browser tests
 
-To empty the contacts table without dropping it or its migrations, truncate
-it directly:
+With PostgreSQL running and the web dependencies installed, start from the
+repository root:
 
 ```sh
-docker exec -it lk-contacts-postgres-1 psql -U lk_contacts -d lk_contacts \
-  -c 'TRUNCATE TABLE "Contacts", "FailedImportRows";'
+cd tests/Contacts.E2E
+npm ci
+npx playwright install --with-deps chromium
+npm test
 ```
 
-This keeps the schema and migration history, so no `dotnet ef database
-update` is needed afterward. Because the API seeds 300 contacts the first
-time it starts against an empty `Contacts` table, restarting the API right
-after this command re-adds those 300 rows — stop the API first, or import a
-different fixture instead, if you want the table to stay empty.
-
-Where there is no shell access to the database directly (for example, the
-deployed Pi5 API), `DELETE /api/contacts` does the same `TRUNCATE`, over
-HTTP, through Swagger or curl. It also requires a bearer token if
-`Auth:Enabled` is `true`:
-
-```sh
-curl -i -X DELETE http://localhost:5187/api/contacts
-```
-
-This empties both `Contacts` and `FailedImportRows` in one call — useful
-between repeated imports of the 1,000,000-row fixture below. There is no
-confirmation step and no undo.
-
-When the EF model intentionally changes, create a migration from the repository
-root and then apply it:
-
-```sh
-dotnet ef migrations add <MigrationName> \
-  --project src/Contacts.Api \
-  --output-dir Data/Migrations
-dotnet ef database update --project src/Contacts.Api
-```
-
-### Name search indexing
-
-`GET /api/contacts?search=` matches the search text anywhere inside the
-first name or surname (`ILIKE '%text%'`), so a plain index can't help — a
-leading wildcard defeats normal index lookups. `FirstName` and `Surname`
-each have a Postgres trigram (`pg_trgm`) GIN index instead, which indexes
-overlapping 3-character chunks of every name so a "contains" search can use
-an index. Measured against the 1,000,000-row fixture below: the trigram
-indexes cut a search from ~240ms (sequential scan) to under 1ms.
-
-### List page ordering index
-
-`GET /api/contacts` orders results by `Surname`, then `FirstName`. Without
-an index on those columns, Postgres has to sort the entire table on every
-request, spilling to disk once the table is large — a plain btree index on
-`(Surname, FirstName, Id)` lets it read rows already in that order instead.
-
-Measured against the 1,000,000-row fixture:
-
-| Request | Before this index | After |
-| -------- | ------------------- | ------ |
-| First page | ~63ms (full sort) | ~0.2ms |
-| A deep, unfiltered page (row 500,000) | ~893ms (sorts to disk) | ~478ms |
-
-This index makes the first page and normal browsing fast, and it is why a
-search stays fast too — a search narrows the table down first, so it is
-almost never paging deep into the full table. It does **not** fully fix a
-deep page over the *entire, unfiltered* table (`OFFSET` still has to walk
-past every skipped row one at a time) — that would need keyset
-("load more after the last row I saw") pagination instead of page numbers,
-which was deferred because it would also change the API shape and remove
-the paginator's jump-to-page-number control. Revisit if the table grows
-much larger and deep unfiltered browsing turns out to matter in practice.
-
-## Run the API
-
-Start PostgreSQL first, then start the development profile (it applies migrations):
-
-```sh
-dotnet run --project src/Contacts.Api --launch-profile http
-```
-
-The HTTP development profile listens on port 5187. Open the Swagger UI at:
-
-```text
-http://localhost:5187/swagger
-```
-
-Swagger UI is also available on the deployed API, not just locally:
-
-```text
-https://contacts-api.baiganio.io/swagger/index.html
-```
-
-The bare root URL (`https://contacts-api.baiganio.io/`) redirects to that
-same page. If `Auth:Enabled` is `true` (as it is in production), get a
-token from `POST /api/auth/token` in Swagger, click the **Authorize**
-button at the top of the page, and paste the token in — see
-[Dummy token auth proof of concept](#dummy-token-auth-proof-of-concept)
-below. Without this, every other endpoint in Swagger returns `401`.
-
-## Run the web application
-
-The web application loads contacts from the API's `GET /api/contacts` and
-creates them through `POST /api/contacts`. Start the API first (see above),
-then in a separate terminal from the repository root:
-
-```sh
-cd web
-npm install
-npm start
-```
-
-Open `http://localhost:5186`. Changes under `web/src/` reload automatically.
-
-The web application calls the API directly at `http://localhost:5187`. The
-API allows this with a CORS policy (in `src/Contacts.Api/Program.cs`) that
-permits requests from `http://localhost:5186`.
-
-Build and test the web application with:
-
-```sh
-cd web
-npm run build
-npm test -- --no-watch
-```
-
-## Deploy the web application to GitHub Pages
-
-The `deploy-pages.yml` workflow builds and deploys the Angular application.
-It is called by `contacts.yml` after backend tests and the Playwright e2e
-suite pass for a pushed `master` commit that touches `web/**` — it no longer
-triggers on push directly. In the repository's GitHub **Settings → Pages**,
-set **Source** to **GitHub Actions**. The published site is:
-
-```text
-https://baiganio.github.io/contacts/
-```
-
-The Pages build uses `/contacts/` as Angular's base URL so its scripts, styles,
-fonts, and favicon resolve beneath the repository path. Run the same build
-locally with:
-
-```sh
-cd web
-npm run build:pages
-```
-
-GitHub Pages hosts only the static Angular application. Until a public API is
-available, the page loads normally and shows its existing API connection error.
-When the API is deployed, set its HTTPS origin in
-`web/src/environments/environment.prod.ts` and allow
-`https://baiganio.github.io` in the API's production CORS policy.
-
-Read the seeded contacts directly with:
-
-```sh
-curl http://localhost:5187/api/contacts
-```
-
-The endpoint reads all persisted contacts, including normalized IBAN values.
-
-Create and persist a contact with:
-
-```sh
-curl -i http://localhost:5187/api/contacts \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "firstName": "Ada",
-    "surname": "Lovelace",
-    "dateOfBirth": "1815-12-10",
-    "address": "12 St James Square, London",
-    "phoneNumber": "+44 20 7946 0000",
-    "iban": "gb82 west 1234 5698 7654 32"
-  }'
-```
-
-Invalid fields return a `400` with a readable per-field error list instead of
-saving anything.
-
-Read, edit, and delete one contact by ID:
-
-```sh
-curl http://localhost:5187/api/contacts/<id>
-
-curl -i -X PUT http://localhost:5187/api/contacts/<id> \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "firstName": "Augusta",
-    "surname": "King",
-    "dateOfBirth": "1815-12-10",
-    "address": "13 St James Square, London",
-    "phoneNumber": "+44 20 7946 0001",
-    "iban": "de89 3704 0044 0532 0130 00"
-  }'
-
-curl -i -X DELETE http://localhost:5187/api/contacts/<id>
-```
-
-A missing ID returns `404` for get, edit, and delete.
-
-## Import contacts from a CSV file
-
-`POST /api/contacts/import` accepts a multipart file upload (field name
-`file`) with these required columns: `FirstName`, `Surname`, `DateOfBirth`
-(`yyyy-MM-dd`), `Street`, `City`, `PostalCode`, `Country`, `Phone`, and
-`Iban`. The address columns are combined into one string:
-`Street, PostalCode City, Country`. Files over 200 MB or 2,000,000 data
-rows are rejected outright (nothing is saved).
-
-Otherwise the import is row-by-row: a row that parses and does not repeat
-an IBAN is saved right away; a row that fails is skipped, listed in the
-response with its row number and error, and recorded in a small review
-queue instead of being silently dropped. Accepted rows are written to the
-database in batches of 5,000 rather than all at once, so a multi-million-row
-file does not hold everything in memory for one giant transaction.
-Importing the 1,000,000-row fixture below takes roughly 30–40 seconds on a
-typical development machine; this is a synchronous HTTP request end to end,
-so a large import means a real wait, not a background job.
-
-### IBAN is unique
-
-A contact's IBAN must be unique. Creating or editing a contact with an
-IBAN already used by another contact returns a `400` field error on
-`Iban`. During import this same rule applies per row, including two rows
-in the same file sharing an IBAN — the first is saved, the rest are
-skipped as duplicates. This means re-importing the same file a second
-time saves nothing (every row is now a duplicate of what the first import
-already saved) instead of creating duplicate contacts.
-
-### Reviewing failed import rows (PoC)
-
-`GET /api/imports/failures` lists rows that have failed to import: their
-original values, their error message, when they were first and last seen,
-and how many times each has been seen. Rows are deduplicated by their
-exact content, so importing the same bad file ten times updates one
-entry's "seen" count instead of creating ten entries. The response is
-capped (default 100, up to 500, via `?limit=`) and reports `totalCount`
-alongside the returned `items`, so a large backlog of distinct failures
-does not force one huge response or an unreadable page.
-
-After an import with failing rows, the Angular page shows a short summary
-("Imported N, M row(s) failed") with a **View failed rows** button that
-opens a small dialog listing the most recent failures via this endpoint.
-This is a minimal proof of concept — there is no paging control in that
-dialog and no way to clear an entry.
-
-Import one of the fixtures under `seed-data/`:
-
-```sh
-curl -i http://localhost:5187/api/contacts/import \
-  -F 'file=@seed-data/contacts-01-initial-5.csv;type=text/csv'
-```
-
-The Angular page has an **Import file** button that opens a file picker,
-sends the chosen CSV to this endpoint, and reloads the table on success.
-
-### Large-scale fixture (1,000,000 rows)
-
-`seed-data/contacts-03-poc-1000000.csv.gz` is a generated, 1,000,000-row
-fixture for testing paging, search, and import error handling at real
-scale, kept compressed in git (about 40 MB instead of about 97 MB) to keep
-the repository small. Names are randomly built from syllables rather than
-picked from a list, so the file has close to 1,000,000 distinct first names
-and close to 1,000,000 distinct surnames — no single search term matches an
-unrealistically large slice of the file.
-
-Four marker surnames are planted at exact, known counts, so a search can be
-pointed at a known answer instead of a random one:
-
-| Search for    | Expect exactly |
-| -------------- | --------------- |
-| `Uniqmarker`   | 1 result         |
-| `Smallgroup`   | 10 results        |
-| `Midgroup`     | 100 results       |
-| `Biggroup`     | 1,000 results     |
-
-Six rows are deliberately broken, one of each kind, so the import
-endpoint's error handling can be exercised at scale instead of just on
-hand-written test files. Every bad row's surname names its own kind, so it
-can be searched for directly:
-
-| Search for           | Kind                                                |
-| --------------------- | ---------------------------------------------------- |
-| `Badrowdupiban`       | IBAN already used by another row (rejected as a duplicate) |
-| `Badrowbadformat`     | IBAN too short to be a valid IBAN                    |
-| `Badrowbadchecksum`   | IBAN with the right shape but a wrong check digit    |
-| `Badrowbaddate`       | Date of birth that isn't a date at all                |
-| `Badrowfuturedob`     | Date of birth in the future                          |
-| `Badrowblank`         | Blank first name                                     |
-
-These six rows are expected to show up in the import response's error list
-(and in `GET /api/imports/failures`), not as saved contacts — the other
-999,994 rows, including all four marker surnames, should still import
-cleanly and be searchable afterward.
-
-The generator that built this file is checked in at
-`tools/seed-generator/` (not part of the API or web solution) — run
-`dotnet run -c Release` from that folder to regenerate or tweak it.
-
-Unzip the fixture, then import it the same way as the smaller fixtures,
-through the API or the Angular **Import file** button:
-
-```sh
-gunzip -k seed-data/contacts-03-poc-1000000.csv.gz
-curl -i http://localhost:5187/api/contacts/import \
-  -F 'file=@seed-data/contacts-03-poc-1000000.csv;type=text/csv'
-```
-
-## Dummy token auth proof of concept
-
-This is a proof of concept for reviewers, not real security. It is off by
-default and does not add real user management, password hashing, or roles.
-
-Turn it on by setting `Auth:Enabled` to `true` (for example in
-`appsettings.Development.json` or with `Auth__Enabled=true`). While it is
-`false` (the default), every route behaves exactly as documented above and
-no login is required.
-
-While the flag is on, every `/api/contacts*` route (list, get, create, edit,
-delete, import) requires a bearer token. Get one from the one hardcoded
-dummy credential
-(`demo` / `demo`):
-
-```sh
-curl -s -X POST http://localhost:5187/api/auth/token \
-  -H 'Content-Type: application/json' \
-  -d '{"username": "demo", "password": "demo"}'
-```
-
-This returns a short-lived signed JWT: `{"token": "..."}`. Requests without
-a valid token get `401 Unauthorized`. Enter the username and password into
-the **Log in** dialog at the top of the Angular page; the dialog calls
-`/api/auth/token` itself and the app holds the returned token in
-`localStorage`, sending it as an `Authorization: Bearer` header on every
-API call. If the flag is on and no token is stored yet, the page shows a
-"Not authenticated" message.
-
-In Swagger UI, get a token from `POST /api/auth/token` the same way, then
-click the green **Authorize** button near the top of the page and paste
-the token in (no `Bearer` prefix needed). Every other endpoint in Swagger
-then sends it automatically.
-
-### Frontend write gating
-
-The Angular page does not gate anything on its own. Add, edit, delete,
-search, and CSV import are always available from the page, whether or not
-a token is logged in — the frontend has no way to read the API's
-`Auth:Enabled` value, so it does not guess. While the flag is off (the
-default), every action just works, same as before this PoC existed. While
-the flag is on, an action without a valid token gets a `401` from the
-API, and the page shows "Not authenticated. Use the login icon in the top
-bar, then try again." Logging in through the login dialog fixes this
-immediately, no reload needed.
+Playwright starts its own API on **5197** and Angular server on **5196**. Leave
+these ports free; you do not need to start those servers manually. Its API
+creates/migrates the separate `contacts_e2e` database with seeding disabled.
+The suite clears that test database between scenarios; the normal development
+`lk_contacts` database is unaffected with the checked-in configuration.
+
+The three scenarios cover:
+
+- Creating, editing, and deleting a persisted contact, with page reloads.
+- Rejecting invalid input and saving after correction.
+- Importing the 5-row and 300-row fixtures into an empty test database,
+  checking Unicode data, search and paging, and rejecting duplicate re-imports.
+
+To watch the browser, run `npm run test:headed` from `tests/Contacts.E2E`.
+
+## Code overview
+
+| Location | Responsibility |
+| --- | --- |
+| [`src/Contacts.Domain/`](src/Contacts.Domain/) | `Contact` entity and `Iban` value object |
+| [`src/Contacts.Api/Contacts/`](src/Contacts.Api/Contacts/) | Endpoints, command/query handlers, validation, CSV import |
+| [`src/Contacts.Api/Data/`](src/Contacts.Api/Data/) | EF Core mappings, PostgreSQL migrations, startup seed |
+| [`web/src/app/contacts/`](web/src/app/contacts/) | Material screen, dialogs, HTTP service, ngrx state |
+| [`tests/`](tests/) | xUnit tests and Playwright scenarios |
+| [`seed-data/`](seed-data/) | Supplied CSV fixtures and optional large fixture |
+
+`Contact` protects its state on construction and update. `Iban` removes
+whitespace, normalizes case, and validates format and checksum. FluentValidation
+returns field errors for API requests; a database constraint enforces IBAN
+uniqueness. The CSV address columns are combined into one address string.
+
+CQRS uses separate command/query records and handlers called directly by Minimal
+API endpoints. Handlers use `ContactsDbContext` directly, and read-only queries
+use `AsNoTracking`. ngrx Store and Effects manage list loading, search, paging,
+and create/edit/delete actions; CSV upload calls the API and refreshes the list.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Docker cannot connect | Start Docker, then retry `docker compose up -d`. |
+| Database connection refused | Run the readiness command above; check whether another PostgreSQL instance occupies port 5432. |
+| API or Angular port is in use | Stop the other process using 5187 or 5186; browser tests use 5197 and 5196. |
+| “Could not load contacts” | Check that the API terminal is still running and local Swagger opens. |
+| “Not authenticated” | Use the login icon with `demo` / `demo`; this is only needed when dummy auth is enabled. |
+| CSV import reports duplicates | IBANs must be unique; the 5-row fixture is already included in the default seed. |
+
+## Further details
+
+[Technical notes](docs/TECHNICAL-NOTES.md) cover API examples, CSV behavior and
+reset commands, database configuration, optional authentication, indexing,
+the million-row fixture, and hosting. Files under `archive/` record development
+history; use this README for the current setup.
