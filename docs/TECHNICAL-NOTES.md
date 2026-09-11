@@ -247,10 +247,8 @@ These six rows are expected to show up in the import response's error list
 999,994 rows, including all four marker surnames, should still import
 cleanly and be searchable afterward.
 
-The generator is in [`tools/seed-generator/`](../tools/seed-generator/), outside
-the application solution. To regenerate the fixture, first change its
-`OutputPath` constant in `Program.cs` to a path on your machine, then run
-`dotnet run -c Release --project tools/seed-generator` from the repository root.
+The generator that produced this fixture is not included in the repository;
+the compressed fixture is the supplied artifact.
 
 Unzip the fixture, then import it the same way as the smaller fixtures,
 through the API or the Angular **Import file** button:
